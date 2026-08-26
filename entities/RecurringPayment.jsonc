@@ -1,0 +1,129 @@
+{
+
+  "name": "RecurringPayment",
+
+  "type": "object",
+
+  "properties": {
+
+    "description": {
+
+      "type": "string"
+
+    },
+
+    "amount": {
+
+      "type": "number"
+
+    },
+
+    "category": {
+
+      "type": "string"
+
+    },
+
+    "type": {
+
+      "type": "string",
+
+      "enum": [
+
+        "income",
+
+        "expense"
+
+      ]
+
+    },
+
+    "frequency": {
+
+      "type": "string",
+
+      "enum": [
+
+        "daily",
+
+        "weekly",
+
+        "monthly",
+
+        "yearly"
+
+      ]
+
+    },
+
+    "next_execution": {
+
+      "type": "string",
+
+      "format": "date"
+
+    },
+
+    "is_active": {
+
+      "type": "boolean",
+
+      "default": true
+
+    },
+
+    "last_executed": {
+
+      "type": "string",
+
+      "format": "date"
+
+    }
+
+  },
+
+  "required": [
+
+    "description",
+
+    "amount",
+
+    "category",
+
+    "type",
+
+    "frequency",
+
+    "next_execution"
+
+  ],
+
+  "rls": {
+
+    "read": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "create": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "update": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "delete": {
+
+      "created_by_id": "{{user.id}}"
+
+    }
+
+  }
+
+}
