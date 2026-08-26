@@ -1,0 +1,84 @@
+{
+
+  "name": "Budget",
+
+  "type": "object",
+
+  "properties": {
+
+    "category": {
+
+      "type": "string"
+
+    },
+
+    "amount": {
+
+      "type": "number"
+
+    },
+
+    "period": {
+
+      "type": "string",
+
+      "enum": [
+
+        "monthly",
+
+        "yearly"
+
+      ],
+
+      "default": "monthly"
+
+    },
+
+    "start_date": {
+
+      "type": "string",
+
+      "format": "date"
+
+    }
+
+  },
+
+  "required": [
+
+    "category",
+
+    "amount"
+
+  ],
+
+  "rls": {
+
+    "read": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "create": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "update": {
+
+      "created_by_id": "{{user.id}}"
+
+    },
+
+    "delete": {
+
+      "created_by_id": "{{user.id}}"
+
+    }
+
+  }
+
+}
+
