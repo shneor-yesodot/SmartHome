@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 140 40% 99%;
+    --foreground: 155 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 155 30% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 155 30% 12%;
+    --primary: 152 84% 34%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 35% 95%;
+    --secondary-foreground: 152 60% 25%;
+    --muted: 150 28% 96%;
+    --muted-foreground: 152 12% 42%;
+    --accent: 150 50% 93%;
+    --accent-foreground: 152 70% 24%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 25% 90%;
+    --input: 150 25% 90%;
+    --ring: 152 84% 34%;
+    --chart-1: 152 84% 34%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 173 58% 39%;
+    --chart-4: 43 74% 56%;
+    --chart-5: 27 87% 60%;
+    --radius: 0.75rem;
+    --font-heading: 'Heebo', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Heebo', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Heebo', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 155 20% 25%;
+    --sidebar-primary: 152 84% 34%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 150 50% 94%;
+    --sidebar-accent-foreground: 152 70% 24%;
+    --sidebar-border: 150 25% 90%;
+    --sidebar-ring: 152 84% 34%;
+  }
+
+  .dark {
+    --background: 155 35% 8%;
+    --foreground: 140 20% 96%;
+    --card: 155 30% 11%;
+    --card-foreground: 140 20% 96%;
+    --popover: 155 30% 11%;
+    --popover-foreground: 140 20% 96%;
+    --primary: 152 70% 45%;
+    --primary-foreground: 155 40% 8%;
+    --secondary: 155 25% 16%;
+    --secondary-foreground: 140 20% 96%;
+    --muted: 155 25% 16%;
+    --muted-foreground: 140 10% 65%;
+    --accent: 155 30% 20%;
+    --accent-foreground: 140 20% 96%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 155 25% 18%;
+    --input: 155 25% 18%;
+    --ring: 152 70% 45%;
+    --chart-1: 152 70% 45%;
+    --chart-2: 160 60% 50%;
+    --chart-3: 173 58% 45%;
+    --chart-4: 43 74% 60%;
+    --chart-5: 27 87% 65%;
+    --sidebar-background: 155 35% 10%;
+    --sidebar-foreground: 140 20% 90%;
+    --sidebar-primary: 152 70% 45%;
+    --sidebar-primary-foreground: 155 40% 8%;
+    --sidebar-accent: 155 25% 16%;
+    --sidebar-accent-foreground: 140 20% 96%;
+    --sidebar-border: 155 25% 18%;
+    --sidebar-ring: 152 70% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
