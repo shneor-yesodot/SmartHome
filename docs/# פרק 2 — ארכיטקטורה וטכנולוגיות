@@ -1,0 +1,146 @@
+# פרק 2 — ארכיטקטורה וטכנולוגיות
+
+## 2.1 תרשים ארכיטקטורה כללי
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    CLIENT (Browser)                      │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│  │  Pages   │  │Components│  │  Hooks   │  │ Services │  │
+│  │ (React)  │  │  (UI)    │  │ (State)  │  │  (API)   │  │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  │
+│       └─────────────┴─────────────┴─────────────┘        │
+│                          │                               │
+│                   Axios / Fetch                          │
+└──────────────────────────┼──────────────────────────────┘
+                           │ HTTPS
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                    SERVER (Node.js)                      │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│  │  Routes  │→ │Middleware│→ │Controllers│→ │ Services │  │
+│  │ (Express)│  │  (Auth)  │  │ (Logic)  │  │ (Email,  │  │
+│  └──────────┘  └──────────┘  └────┬─────┘  │  OCR)    │  │
+│                                   │        └────┬─────┘  │
+│                                   │             │        │
+│                              ┌────▼─────┐  ┌────▼─────┐  │
+│                              │  Models  │  │ External │  │
+│                              │ (Mongoose)│  │   APIs   │  │
+│                              └────┬─────┘  └──────────┘  │
+└───────────────────────────────────┼─────────────────────┘
+                                    │
+                           ┌────────▼────────┐
+                           │     MongoDB      │
+                           │                  │
+                           │  • users         │
+                           │  • transactions  │
+                           │  • categories    │
+                           │  • budgets       │
+                           │  • recurring     │
+                           └──────────────────┘
+```
+
+## 2.2 דפוס ארכיטקטורי
+
+המערכת בנויה בדפוס **MVC מורחב** (Model-View-Controller) בשכבות:
+
+| שכבה | אחריות | תיקייה |
+|------|--------|--------|
+| **Routes** | הגדרת נקודות קצה (endpoints) ושיוך ל-controllers | `backend/routes/` |
+| **Middleware** | אימות JWT, ולידציה, טיפול שגיאות, rate limiting | `backend/middleware/` |
+| **Controllers** | לוגיקת הבקשה — קבלת נתונים, קריאה ל-services | `backend/controllers/` |
+| **Services** | לוגיקה עסקית, קריאה ל-APIs חיצוניים | `backend/services/` |
+| **Models** | הגדרת סכמות Mongoose ואינטראקציה עם MongoDB | `backend/models/` |
+| **Validators** | ולידציה של קלט (Joi) | `backend/validators/` |
+
+## 2.3 טכנולוגיות מפורטות
+
+### Frontend
+
+| טכנולוגיה | גרסה | שימוש |
+|-----------|------|-------|
+| React | 18.2 | ספריית UI ראשית |
+| Vite | 5.x | כלי בנייה ו-dev server |
+| React Router | 6.x | ניתוב בין עמודים |
+| Tailwind CSS | 3.x | עיצוב utility-first |
+| Recharts | 2.x | תרשימים וגרפים |
+| lucide-react | 0.475 | ספריית אייקונים |
+| Radix UI | — | רכיבי UI נגישים (Dialog, Select, Switch) |
+
+### Backend
+
+| טכנולוגיה | גרסה | שימוש |
+|-----------|------|-------|
+| Node.js | 20+ | סביבת ריצה |
+| Express | 4.x | תשתית שרת HTTP |
+| Mongoose | 8.x | ODM ל-MongoDB |
+| JWT (jsonwebtoken) | 9.x | אימות וטוקנים |
+| bcrypt | 5.x | הצפנת סיסמאות |
+| Joi | 17.x | ולידציה |
+| helmet | 7.x | אבטחת HTTP headers |
+| express-rate-limit | 7.x | הגבלת קצב בקשות |
+| multer | 1.4 | העלאת קבצים |
+| node-cron | 3.x | משימות מתוזמנות |
+
+### Database
+
+| טכנולוגיה | שימוש |
+|-----------|------|
+| MongoDB | מסד נתונים NoSQL מסמכי |
+| MongoDB Atlas | שירות מנוהל בענן |
+
+### אינטגרציות חיצוניות
+
+| שירות | שימוש |
+|-------|------|
+| LLM API (GPT/Claude) | זיהוי ופירוק קבלות (OCR + NLP) |
+| Nodemailer / SendGrid | שליחת מיילים (התראות, אימות) |
+| Google OAuth 2.0 | התחברות עם Google |
+
+## 2.4 זרימת בקשה טיפוסית
+
+```
+1. משתמש לוחץ "הוסף עסקה" ב-Frontend
+2. React → POST /api/transactions עם JWT ב-header
+3. authMiddleware מאמת את הטוקן
+4. transactionValidator מוודא את הקלט
+5. transactionController.create מקבל את הבקשה
+6. transactionService.create יוצר מסמך ב-MongoDB
+7. budgetService.checkAlert בודק חריגת תקציב
+8. אם חריגה → emailService.sendAlert שולח מייל
+9. תגובה חוזרת ל-Frontend → עדכון UI
+```
+
+## 2.5 מבנה תיקיות
+
+```
+SmartHome/
+├── docs/                      # ספר פרויקט
+├── frontend/                  # אפליקציית React
+│   ├── src/
+│   │   ├── pages/              # עמודים
+│   │   ├── components/         # רכיבים
+│   │   │   ├── layout/         # פריסה (Sidebar, Topbar)
+│   │   │   ├── dashboard/      # רכיבי דשבורד
+│   │   │   ├── transactions/   # רכיבי עסקאות
+│   │   │   ├── common/         # רכיבים משותפים
+│   │   │   └── ui/             # shadcn/ui
+│   │   ├── lib/                # עזרים (format, alerts)
+│   │   ├── hooks/              # Custom hooks
+│   │   └── services/           # קריאות API
+│   └── package.json
+├── backend/                   # שרת Node.js
+│   ├── src/
+│   │   ├── config/             # קונפיגורציה (DB, env)
+│   │   ├── models/             # סכמות Mongoose
+│   │   ├── controllers/        # לוגיקת בקשות
+│   │   ├── routes/             # הגדרת endpoints
+│   │   ├── middleware/        # אימות, ולידציה
+│   │   ├── services/           # לוגיקה עסקית
+│   │   ├── validators/         # ולידציה
+│   │   └── jobs/               # משימות cron
+│   └── package.json
+└── README.md
+``
