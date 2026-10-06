@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,9 +27,9 @@ export default function Budgets() {
 
   const load = async () => {
     const [bdgs, txns, cats] = await Promise.all([
-      base44.entities.Budget.list(),
-      base44.entities.Transaction.list('-date', 500),
-      base44.entities.Category.list(),
+      api.entities.Budget.list(),
+      api.entities.Transaction.list('-date', 500),
+      api.entities.Category.list(),
     ]);
     setBudgets(bdgs);
     setTransactions(txns);
@@ -56,8 +56,8 @@ export default function Budgets() {
     setSaving(true);
     const payload = { ...form, amount: Number(form.amount) };
     try {
-      if (editing) await base44.entities.Budget.update(editing.id, payload);
-      else await base44.entities.Budget.create(payload);
+      if (editing) await api.entities.Budget.update(editing.id, payload);
+      else await api.entities.Budget.create(payload);
       setOpen(false);
       load();
     } finally {
@@ -67,7 +67,7 @@ export default function Budgets() {
 
   const remove = async (b) => {
     if (!confirm(`למחוק תקציב "${b.category}"?`)) return;
-    await base44.entities.Budget.delete(b.id);
+    await api.entities.Budget.delete(b.id);
     load();
   };
 

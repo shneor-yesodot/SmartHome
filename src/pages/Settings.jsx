@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { User, Plus, Trash2, Tag, Mail, Loader2, LogOut } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
 import PageLoader from '@/components/common/PageLoader';
 import EmptyState from '@/components/common/EmptyState';
 
@@ -22,10 +21,10 @@ export default function Settings() {
 
   const load = async () => {
     try {
-      const u = await base44.auth.me();
+      const u = await api.auth.me();
       setUser(u);
     } catch {}
-    const cats = await base44.entities.Category.list();
+    const cats = await api.entities.Category.list();
     setCategories(cats);
     setLoading(false);
   };
@@ -36,7 +35,7 @@ export default function Settings() {
     e.preventDefault();
     setSaving(true);
     try {
-      await base44.entities.Category.create({ name: form.name, type: form.type, color: form.color });
+      await api.entities.Category.create({ name: form.name, type: form.type, color: form.color });
       setOpen(false);
       setForm({ name: '', type: 'expense', color: '#16a34a' });
       load();
@@ -47,11 +46,11 @@ export default function Settings() {
 
   const removeCategory = async (c) => {
     if (!confirm(`למחוק קטגוריה "${c.name}"?`)) return;
-    await base44.entities.Category.delete(c.id);
+    await api.entities.Category.delete(c.id);
     load();
   };
 
-  const handleLogout = () => base44.auth.logout('/login');
+  const handleLogout = () => api.auth.logout('/login');
 
   if (loading) return <PageLoader />;
 

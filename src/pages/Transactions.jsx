@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Plus, Search, Pencil, Trash2, Download, Upload, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { formatCurrency, formatDate, isSameMonth } from '@/lib/format';
+import { formatCurrency, formatDate } from '@/lib/format';
 import PageLoader from '@/components/common/PageLoader';
 import EmptyState from '@/components/common/EmptyState';
 import TransactionForm from '@/components/transactions/TransactionForm';
@@ -43,8 +43,8 @@ export default function Transactions() {
 
   const load = async () => {
     const [txns, cats] = await Promise.all([
-      base44.entities.Transaction.list('-date', 500),
-      base44.entities.Category.list(),
+      api.entities.Transaction.list('-date', 500),
+      api.entities.Category.list(),
     ]);
     setTransactions(txns);
     setCategories(cats);
@@ -64,7 +64,7 @@ export default function Transactions() {
 
   const handleDelete = async (t) => {
     if (!confirm(`למחוק את "${t.description}"?`)) return;
-    await base44.entities.Transaction.delete(t.id);
+    await api.entities.Transaction.delete(t.id);
     load();
   };
 

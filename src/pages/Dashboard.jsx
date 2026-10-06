@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeftRight, Plus, Target } from 'lucide-react';
@@ -44,8 +44,8 @@ export default function Dashboard() {
 
   const load = async () => {
     const [txns, bdgs] = await Promise.all([
-      base44.entities.Transaction.list('-date', 300),
-      base44.entities.Budget.list(),
+      api.entities.Transaction.list('-date', 300),
+      api.entities.Budget.list(),
     ]);
     setTransactions(txns);
     setBudgets(bdgs);

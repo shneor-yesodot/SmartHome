@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, LogOut, User } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 
 const titles = {
   '/': 'דשבורד',
@@ -18,13 +18,13 @@ export default function Topbar({ onMenuClick }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    api.auth.me().then(setUser).catch(() => {});
   }, []);
 
   const title = titles[location.pathname] || 'SmartHome';
 
   const handleLogout = () => {
-    base44.auth.logout('/login');
+    api.auth.logout('/login');
   };
 
   return (

@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Upload, FileSpreadsheet, Loader2, Check, AlertCircle } from 'lucide-react';
 import { todayISO } from '@/lib/format';
-import { checkBudgetAlerts } from '@/lib/budgetAlerts';
 import { toast } from '@/components/ui/use-toast';
 
 export default function ImportExcel({ open, onClose, onDone }) {
@@ -25,31 +21,9 @@ export default function ImportExcel({ open, onClose, onDone }) {
     setParsing(true);
     setPreview([]);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: f });
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: 'object',
-          properties: {
-            transactions: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  type: { type: 'string' },
-                  amount: { type: 'number' },
-                  category: { type: 'string' },
-                  description: { type: 'string' },
-                  merchant: { type: 'string' },
-                  date: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-      });
-      const rows = result.output?.transactions || result.output || [];
-      const normalized = (Array.isArray(rows) ? rows : []).map((r) => ({
+      const { file_url } = await api.files.upload(f);
+      const { transactions: rows } = await api.files.extractTransactions(file_url);
+      const normalized = (rows || []).map((r) => ({
         type: (r.type || 'expense').toLowerCase().includes('inc') ? 'income' : 'expense',
         amount: Number(r.amount) || 0,
         category: r.category || 'אחר',
@@ -72,12 +46,9 @@ export default function ImportExcel({ open, onClose, onDone }) {
     if (!preview.length) return;
     setSaving(true);
     try {
-      const created = await base44.entities.Transaction.bulkCreate(preview);
-      for (const t of created) {
-        await checkBudgetAlerts(t);
-      }
+      const created = await api.entities.Transaction.bulkCreate(preview);
       toast({ title: `${created.length} עסקאות יובאו` });
-      reset();
+      close();
       onDone();
     } catch (err) {
       toast({ title: 'שגיאה בייבוא', description: err.message, variant: 'destructive' });

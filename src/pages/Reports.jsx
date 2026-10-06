@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, TrendingUp, TrendingDown, PiggyBank, Percent } from 'lucide-react';
@@ -27,7 +27,7 @@ export default function Reports() {
   const [month, setMonth] = useState(now.getMonth());
 
   useEffect(() => {
-    base44.entities.Transaction.list('-date', 1000).then((t) => {
+    api.entities.Transaction.list('-date', 1000).then((t) => {
       setTransactions(t);
       setLoading(false);
     });

@@ -5,13 +5,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { todayISO } from '@/lib/format';
-import { checkBudgetAlerts } from '@/lib/budgetAlerts';
 import { Loader2 } from 'lucide-react';
 
 const empty = { type: 'expense', amount: '', category: '', description: '', merchant: '', date: todayISO(), notes: '' };
@@ -44,11 +42,9 @@ export default function TransactionForm({ open, onClose, onSaved, editingTransac
     const payload = { ...form, amount: Number(form.amount) };
     try {
       if (editingTransaction) {
-        await base44.entities.Transaction.update(editingTransaction.id, payload);
-        await checkBudgetAlerts({ ...payload, category: editingTransaction.category });
+        await api.entities.Transaction.update(editingTransaction.id, payload);
       } else {
-        const created = await base44.entities.Transaction.create(payload);
-        await checkBudgetAlerts(created);
+        await api.entities.Transaction.create(payload);
       }
       onSaved();
       onClose();

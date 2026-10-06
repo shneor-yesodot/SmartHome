@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,8 +43,8 @@ export default function Recurring() {
 
   const load = async () => {
     const [items_, cats] = await Promise.all([
-      base44.entities.RecurringPayment.list('-next_execution'),
-      base44.entities.Category.list(),
+      api.entities.RecurringPayment.list('-next_execution'),
+      api.entities.Category.list(),
     ]);
     setItems(items_);
     setCategories(cats);
@@ -73,8 +73,8 @@ export default function Recurring() {
     setSaving(true);
     const payload = { ...form, amount: Number(form.amount) };
     try {
-      if (editing) await base44.entities.RecurringPayment.update(editing.id, payload);
-      else await base44.entities.RecurringPayment.create(payload);
+      if (editing) await api.entities.RecurringPayment.update(editing.id, payload);
+      else await api.entities.RecurringPayment.create(payload);
       setOpen(false);
       load();
     } finally {
@@ -83,20 +83,20 @@ export default function Recurring() {
   };
 
   const toggleActive = async (r) => {
-    await base44.entities.RecurringPayment.update(r.id, { is_active: !r.is_active });
+    await api.entities.RecurringPayment.update(r.id, { is_active: !r.is_active });
     load();
   };
 
   const remove = async (r) => {
     if (!confirm(`למחוק "${r.description}"?`)) return;
-    await base44.entities.RecurringPayment.delete(r.id);
+    await api.entities.RecurringPayment.delete(r.id);
     load();
   };
 
   const executeNow = async (r) => {
     setExecuting(r.id);
     try {
-      await base44.entities.Transaction.create({
+      await api.entities.Transaction.create({
         type: r.type,
         amount: r.amount,
         category: r.category,
@@ -104,7 +104,7 @@ export default function Recurring() {
         date: todayISO(),
         is_recurring: true,
       });
-      await base44.entities.RecurringPayment.update(r.id, {
+      await api.entities.RecurringPayment.update(r.id, {
         last_executed: todayISO(),
         next_execution: nextDate(r.next_execution, r.frequency),
       });

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,10 +9,17 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
+const OAUTH_ERRORS = {
+  google: "ההתחברות עם Google נכשלה. נסו שוב.",
+  google_unavailable: "התחברות עם Google עדיין לא הוגדרה בשרת.",
+};
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    () => OAUTH_ERRORS[new URLSearchParams(window.location.search).get("error")] || ""
+  );
   const [loading, setLoading] = useState(false);
   const returnTo = safeReturnTo();
 
@@ -21,7 +28,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
+      await api.auth.login(email, password);
       window.location.href = returnTo;
     } catch (err) {
       setError(err.message || "אימייל או סיסמה שגויים");
@@ -31,7 +38,7 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
+    api.auth.loginWithGoogle(returnTo);
   };
 
   return (

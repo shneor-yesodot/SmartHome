@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+
 import { Image as ImageIcon, ScanLine, Loader2, Check, Sparkles, Trash2, Plus, Store, Calendar } from 'lucide-react';
 import { todayISO, formatCurrency } from '@/lib/format';
-import { checkBudgetAlerts } from '@/lib/budgetAlerts';
 import { toast } from '@/components/ui/use-toast';
 
 export default function UploadReceipt() {
@@ -37,30 +34,8 @@ export default function UploadReceipt() {
     setAnalyzing(true);
     setResult(null);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const llmResult = await base44.integrations.Core.InvokeLLM({
-        prompt: 'נתח את החשבונית/הקבלה בתמונה. חלץ: שם בית העסק, תאריך, סכום כולל, ורשימת כל פריטי המוצרים (כל פריט עם שם, מחיר וקטגוריה מתאימה מהרשימה: מזון, תחבורה, קניות, חשבונות, בריאות, פנאי, מסעדות, אחר). החזר JSON בלבד עם מערך items.',
-        file_urls: [file_url],
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            merchant: { type: 'string' },
-            date: { type: 'string' },
-            total: { type: 'number' },
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string' },
-                  price: { type: 'number' },
-                  category: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-      });
+      const { file_url } = await api.files.upload(file);
+      const llmResult = await api.files.analyzeReceipt(file_url);
       setResult({ ...llmResult, receipt_url: file_url });
       setMeta({ merchant: llmResult.merchant || '', date: llmResult.date || todayISO() });
       const parsedItems = (llmResult.items || []).map((it) => ({
@@ -94,7 +69,7 @@ export default function UploadReceipt() {
     }
     setSaving(true);
     try {
-      const created = await base44.entities.Transaction.bulkCreate(
+      const created = await api.entities.Transaction.bulkCreate(
         valid.map((it) => ({
           type: 'expense',
           amount: Number(it.price),
@@ -102,13 +77,9 @@ export default function UploadReceipt() {
           description: it.name,
           merchant: meta.merchant,
           date: meta.date,
-          receipt_url: result?.receipt_url || null,
+          receipt_url: result?.receipt_url || '',
         }))
       );
-      // check budget alerts for each created expense
-      for (const t of created) {
-        await checkBudgetAlerts(t);
-      }
       toast({ title: `${created.length} עסקאות נוצרו`, description: `מתוך החשבונית של ${meta.merchant || 'בית העסק'}` });
       navigate('/transactions');
     } catch (err) {
