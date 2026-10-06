@@ -3,8 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config();
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// Single source of configuration: the .env at the repository root.
+// Real environment variables (e.g. set by the host in production) take precedence.
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 const required = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];

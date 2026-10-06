@@ -11,7 +11,7 @@
 
 ```bash
 npm run setup          # מתקין תלויות ל-frontend ול-server
-cp .env.example .env   # ולערוך לפי הצורך
+cp .env.example .env   # ולערוך לפי הצורך (קובץ .env יחיד, בשורש הפרויקט)
 ```
 
 ## הרצה בפיתוח
@@ -38,9 +38,20 @@ npm run dev
 
 | יכולת | משתני סביבה |
 |---|---|
-| סריקת קבלות (AI) | `OPENAI_API_KEY`, `LLM_MODEL` |
+| סריקת קבלות (AI) | `GEMINI_API_KEY`, `GEMINI_MODEL` (ברירת מחדל: `gemini-3.8-flash`) |
 | התחברות עם Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` |
 | שליחת מיילים | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` |
+
+### סריקת קבלות עם Gemini
+
+1. מוציאים מפתח API (חינמי) ב-[Google AI Studio](https://aistudio.google.com/apikey).
+2. מכניסים אותו ל-`.env` שבשורש הפרויקט:
+   ```
+   GEMINI_API_KEY=המפתח-שלכם
+   ```
+3. מפעילים מחדש את השרת.
+
+התמונה נשלחת ל-Gemini מקודדת ב-base64 יחד עם סכמת JSON, וה-AI מחזיר את שם בית העסק, התאריך, הסכום וכל הפריטים עם קטגוריה. בלי מפתח, מסך העלאת הקבלה מציג הודעה שהיכולת לא מוגדרת, וכל שאר האפליקציה עובדת כרגיל.
 
 ## Production
 

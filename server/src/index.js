@@ -38,8 +38,19 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true });
+const limiter = (max) =>
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: 'error',
+      error: { code: 'RATE_LIMITED', message: 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.' },
+    },
+  });
+const apiLimiter = limiter(300);
+const authLimiter = limiter(20);
 
 app.use('/api', apiLimiter);
 for (const p of ['login', 'register', 'verify-otp', 'resend-otp', 'forgot-password', 'reset-password']) {
