@@ -58,8 +58,10 @@ export async function analyzeReceiptImage(absPath) {
   if (!mime) throw new ApiError(400, 'VALIDATION_ERROR', 'יש להעלות קובץ תמונה');
 
   const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  const busy = () => new ApiError(503, 'LLM_BUSY', 'שירות ה-AI עמוס כרגע. נסו שוב בעוד כמה דקות.');
   const res = await fetch(`${GEMINI_URL}/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
+    signal: AbortSignal.timeout(90_000),
     headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [
@@ -75,10 +77,14 @@ export async function analyzeReceiptImage(absPath) {
         response_schema: RECEIPT_SCHEMA,
       },
     }),
+  }).catch((err) => {
+    if (err.name === 'TimeoutError') throw busy();
+    throw err;
   });
 
   if (!res.ok) {
     console.error('Gemini error', res.status, (await res.text()).slice(0, 500));
+    if (res.status === 429 || res.status === 503) throw busy();
     throw new ApiError(502, 'LLM_ERROR', 'ניתוח החשבונית נכשל');
   }
 
