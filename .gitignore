@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+coverage/
+.vite
+
+# Runtime data: embedded MongoDB and uploaded receipts
+backend/.data/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs & OS / editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local AI tooling output
+repomix-output.xml
