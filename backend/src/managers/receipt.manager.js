@@ -95,7 +95,19 @@ const confirm = async (userId, id, { merchant, date, items }) => {
   return { receipt, created: transactions.length };
 };
 
-const list = (userId) => receiptRepository.findAllByUser(userId, {}, { sort: { createdAt: -1 }, limit: 30 });
+/** Newest first, with the category of every product line. */
+const list = async (userId, { page = 1, limit = 20 } = {}) => {
+  const [items, total] = await Promise.all([
+    receiptRepository.findAllByUser(userId, {}, {
+      sort: { createdAt: -1 },
+      skip: (page - 1) * limit,
+      limit,
+      populate: { path: 'items.category', select: 'name icon color' },
+    }),
+    receiptRepository.countByUser(userId),
+  ]);
+  return { items, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } };
+};
 
 const remove = async (userId, id) => {
   const receipt = await receiptRepository.deleteByUser(userId, id);

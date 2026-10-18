@@ -2,7 +2,10 @@ const receiptManager = require('../managers/receipt.manager');
 const asyncHandler = require('../utils/asyncHandler');
 const { ok, created, noContent } = require('../utils/response');
 
-const list = asyncHandler(async (req, res) => ok(res, await receiptManager.list(req.user.id)));
+const list = asyncHandler(async (req, res) => {
+  const { items, pagination } = await receiptManager.list(req.user.id, req.query);
+  ok(res, items, { pagination });
+});
 const scan = asyncHandler(async (req, res) => created(res, await receiptManager.scan(req.user.id, req.file)));
 const confirm = asyncHandler(async (req, res) =>
   created(res, await receiptManager.confirm(req.user.id, req.params.id, req.body))

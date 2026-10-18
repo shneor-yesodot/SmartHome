@@ -127,7 +127,7 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/receipts` | 30 הקבלות האחרונות |
+| GET | `/receipts?page=&limit=` | הקבלות, מהחדשה לישנה, עם הקטגוריה של כל מוצר. `meta.pagination` כמו בעסקאות (ברירת מחדל 20 לעמוד) |
 | POST | `/receipts/scan` | העלאת תמונה / PDF (שדה `file`), פענוח ב‑Gemini, מחזיר שורות מוצר לבדיקה |
 | POST | `/receipts/:id/confirm` | `merchant, date, items[]` – כל פריט נשמר כעסקה נפרדת |
 | GET | `/receipts/:id/file` | הקובץ המקורי (לבעלים בלבד) |

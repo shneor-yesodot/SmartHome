@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BarChart3, LayoutGrid, Package, PiggyBank, RefreshCw, ScanLine, Settings, Target } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, LayoutGrid, Package, PiggyBank, Receipt, RefreshCw, ScanLine, Settings, Target } from 'lucide-react';
 
 export const NAV_ITEMS = [
   { to: '/', label: 'דשבורד', icon: LayoutGrid, end: true },
@@ -9,6 +9,7 @@ export const NAV_ITEMS = [
   { to: '/goals', label: 'יעדים', icon: PiggyBank },
   { to: '/recurring', label: 'הוראות קבע', icon: RefreshCw },
   { to: '/receipts', label: 'העלאת קבלה', icon: ScanLine },
+  { to: '/my-receipts', label: 'הקבלות שלי', icon: Receipt },
   { to: '/settings', label: 'הגדרות', icon: Settings },
 ];
 

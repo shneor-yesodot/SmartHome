@@ -20,6 +20,7 @@ const Budgets = lazy(() => import('../pages/Budgets'));
 const Goals = lazy(() => import('../pages/Goals'));
 const Recurring = lazy(() => import('../pages/Recurring'));
 const UploadReceipt = lazy(() => import('../pages/UploadReceipt'));
+const MyReceipts = lazy(() => import('../pages/MyReceipts'));
 const Settings = lazy(() => import('../pages/Settings'));
 
 export default function AppRouter() {
@@ -47,6 +48,7 @@ export default function AppRouter() {
             <Route path="/goals" element={<Goals />} />
             <Route path="/recurring" element={<Recurring />} />
             <Route path="/receipts" element={<UploadReceipt />} />
+            <Route path="/my-receipts" element={<MyReceipts />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
