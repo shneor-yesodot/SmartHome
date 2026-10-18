@@ -9,28 +9,28 @@ export default function SummaryCards({ summary }) {
   return (
     <div className="space-y-4">
       <section
-        className="rounded-2xl bg-gradient-to-l from-brand-800 to-brand-600 p-6 text-center text-white shadow-card sm:p-8"
+        className="card border-t-4 border-t-brand-500 bg-gradient-to-b from-brand-50 to-white p-6 text-center sm:p-8"
         aria-label="יתרה נוכחית"
       >
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-brand-100">
-          <Wallet className="h-4 w-4" />
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-soft">
+          <Wallet className="h-4 w-4 text-brand-600" />
           יתרה נוכחית
         </span>
-        <p className={`tabular mt-1 text-4xl font-extrabold leading-tight sm:text-5xl ${negative ? 'text-red-200' : ''}`}>
+        <p className={`tabular mt-1 text-4xl font-extrabold leading-tight sm:text-5xl ${negative ? 'text-danger-500' : 'text-ink'}`}>
           {formatMoney(summary.balance, { round: true })}
         </p>
-        <p className="tabular mt-2 text-sm text-brand-100">מאזן החודש: {formatSigned(summary.monthBalance, { round: true })}</p>
+        <p className="tabular mt-2 text-sm text-ink-soft">מאזן החודש: {formatSigned(summary.monthBalance, { round: true })}</p>
 
         {summary.savedInGoals > 0 && (
-          <dl className="tabular mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-x-8 gap-y-2 border-t border-white/20 pt-4 text-sm sm:flex-row">
+          <dl className="tabular mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-x-8 gap-y-2 border-t border-line pt-4 text-sm sm:flex-row">
             <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 shrink-0 text-brand-200" />
-              <dt className="text-brand-100">פנוי לשימוש:</dt>
-              <dd className="font-bold">{formatMoney(summary.available, { round: true })}</dd>
+              <Wallet className="h-4 w-4 shrink-0 text-brand-600" />
+              <dt className="text-ink-soft">פנוי לשימוש:</dt>
+              <dd className={`font-bold ${summary.available < 0 ? 'text-danger-500' : ''}`}>{formatMoney(summary.available, { round: true })}</dd>
             </div>
             <div className="flex items-center gap-2">
-              <PiggyBank className="h-4 w-4 shrink-0 text-brand-200" />
-              <dt className="text-brand-100">מתוכם ביעדי חיסכון:</dt>
+              <PiggyBank className="h-4 w-4 shrink-0 text-brand-600" />
+              <dt className="text-ink-soft">מתוכם ביעדי חיסכון:</dt>
               <dd className="font-bold">{formatMoney(summary.savedInGoals, { round: true })}</dd>
             </div>
           </dl>
