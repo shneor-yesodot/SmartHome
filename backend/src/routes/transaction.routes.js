@@ -12,6 +12,7 @@ router.get('/export', validate(schema.listQuery, 'query'), controller.exportExce
 router.get('/import/template', controller.importTemplate);
 router.post('/import/preview', sheetUpload, requireFile('sheet'), controller.importPreview);
 router.post('/bulk', validate(schema.bulkCreate), controller.bulkCreate);
+router.post('/basket', validate(schema.basket), controller.createBasket);
 
 router.route('/').get(validate(schema.listQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
 

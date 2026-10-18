@@ -74,6 +74,7 @@
 | GET | `/transactions/import/template` | הורדת קובץ תבנית ליבוא |
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
 | POST | `/transactions/bulk` | יצירה גורפת: `rows[]` (עד 1000) |
+| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת |
 
 ## קטגוריות – `/api/categories`
 

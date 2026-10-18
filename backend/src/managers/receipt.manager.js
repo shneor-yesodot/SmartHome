@@ -77,17 +77,7 @@ const confirm = async (userId, id, { merchant, date, items }) => {
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
   if (receipt.status === 'confirmed') throw ApiError.conflict('הקבלה הזו כבר נשמרה כעסקאות');
 
-  const rows = items.map((item) => ({
-    type: 'expense',
-    amount: item.total,
-    category: item.category,
-    description: item.name,
-    productName: item.name,
-    quantity: item.quantity,
-    unitPrice: round2(item.total / item.quantity),
-    merchant,
-    date,
-  }));
+  const rows = transactionManager.itemsToRows({ merchant, date, items });
   const transactions = await transactionManager.bulkCreate(userId, rows, {
     source: 'receipt',
     extra: { receipt: receipt._id },

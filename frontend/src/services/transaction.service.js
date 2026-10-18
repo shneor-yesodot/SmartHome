@@ -15,4 +15,6 @@ export const transactionService = {
     return unwrap(api.post('/transactions/import/preview', form));
   },
   bulkCreate: (rows) => unwrap(api.post('/transactions/bulk', { rows })),
+  /** One purchase with several products: { merchant, date, notes?, items: [{ name, quantity, total, category }] } */
+  createBasket: (data) => unwrap(api.post('/transactions/basket', data)),
 };
