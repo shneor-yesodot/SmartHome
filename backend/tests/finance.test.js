@@ -1,4 +1,12 @@
-const { calcHealthScore, calcForecast, calcGoalProgress, calcSavingsPlan, totalsByType, percentChange } = require('../src/utils/finance');
+const {
+  calcHealthScore,
+  calcForecast,
+  calcGoalProgress,
+  calcSavingsPlan,
+  sumOneOffExpenses,
+  totalsByType,
+  percentChange,
+} = require('../src/utils/finance');
 
 describe('totalsByType', () => {
   it('sums income and expenses separately', () => {
@@ -48,6 +56,14 @@ describe('calcHealthScore', () => {
   });
 });
 
+describe('sumOneOffExpenses', () => {
+  it('picks only expenses that are both large and a big share of the month', () => {
+    expect(sumOneOffExpenses([4000, 50, 50, 50])).toBe(4000);
+    expect(sumOneOffExpenses([250])).toBe(0); // below the minimum
+    expect(sumOneOffExpenses([400, 400, 400, 400, 400])).toBe(0); // regular, none stands out
+  });
+});
+
 describe('calcForecast', () => {
   it('extends the daily average when there is no history', () => {
     const forecast = calcForecast({ income: 9000, expense: 3000, dayOfMonth: 10, totalDays: 30, upcomingExpense: 500 });
@@ -55,6 +71,28 @@ describe('calcForecast', () => {
     expect(forecast.projectedExpense).toBe(9500);
     expect(forecast.projectedBalance).toBe(-500);
     expect(forecast.basedOnHistory).toBe(false);
+  });
+
+  it('does not multiply a big one-off purchase by the days left', () => {
+    // A new account: one 4,500 shopping trip on the 11th, nothing else
+    const forecast = calcForecast({
+      income: 5000,
+      expense: 4500,
+      dayOfMonth: 11,
+      totalDays: 31,
+      oneOffExpense: sumOneOffExpenses([4500]),
+    });
+    expect(forecast.oneOffExpense).toBe(4500);
+    expect(forecast.projectedExpense).toBe(4500);
+    expect(forecast.projectedBalance).toBe(500);
+  });
+
+  it('still extends the regular spending next to a one-off expense', () => {
+    // Rent 4,000 + ten small purchases of 50 by day 10
+    const amounts = [4000, ...Array(10).fill(50)];
+    const forecast = calcForecast({ income: 9000, expense: 4500, dayOfMonth: 10, totalDays: 30, oneOffExpense: sumOneOffExpenses(amounts) });
+    expect(forecast.dailyAverage).toBe(50);
+    expect(forecast.projectedExpense).toBe(5500);
   });
 
   it('uses the typical rest-of-month figures when history exists', () => {

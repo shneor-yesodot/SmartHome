@@ -4,7 +4,7 @@ const budgetManager = require('./budget.manager');
 const goalManager = require('./goal.manager');
 const { breakdownByCategory } = require('./report.manager');
 const { monthRange, currentMonth, shiftMonth, daysInMonth, monthKey, dayKey } = require('../utils/dateUtils');
-const { round2, average, totalsByType, calcHealthScore, calcForecast } = require('../utils/finance');
+const { round2, average, totalsByType, calcHealthScore, calcForecast, sumOneOffExpenses } = require('../utils/finance');
 
 const MONTHS_IN_CHART = 6;
 
@@ -97,6 +97,7 @@ const overview = async (userId, now = new Date()) => {
       expected,
       upcomingIncome: sumPending('income'),
       upcomingExpense: sumPending('expense'),
+      oneOffExpense: sumOneOffExpenses(thisMonth.filter((t) => t.type === 'expense').map((t) => t.amount)),
     }),
     monthly,
     categories: breakdownByCategory(thisMonth, 'expense'),

@@ -61,15 +61,36 @@ const calcHealthScore = ({ income, expense, budgets = [], previousExpenses = [] 
   };
 };
 
+// An expense this large is treated as one-off (rent, a big grocery run, an appliance):
+// it is counted once in the projection instead of being multiplied by the days left
+const ONE_OFF_MIN = 300;
+const ONE_OFF_SHARE = 0.25;
+
+/** Sum of the one-off expenses among this month's expense amounts. */
+const sumOneOffExpenses = (amounts) => {
+  const total = amounts.reduce((s, a) => s + a, 0);
+  return round2(amounts.filter((a) => a >= ONE_OFF_MIN && a >= total * ONE_OFF_SHARE).reduce((s, a) => s + a, 0));
+};
+
 /**
  * Month-end projection.
  * With history: what was already recorded + what is usually still recorded after this
  * day of the month (so a rent payment on the 1st is not multiplied by 30).
- * Without history: average daily spend so far, extended to the whole month.
+ * Without history: average daily spend so far (without one-off expenses), extended to the whole month.
  * Known recurring payments that are still due act as a lower bound.
  */
-const calcForecast = ({ income, expense, dayOfMonth, totalDays, expected = null, upcomingIncome = 0, upcomingExpense = 0 }) => {
-  const dailyAverage = dayOfMonth > 0 ? expense / dayOfMonth : 0;
+const calcForecast = ({
+  income,
+  expense,
+  dayOfMonth,
+  totalDays,
+  expected = null,
+  upcomingIncome = 0,
+  upcomingExpense = 0,
+  oneOffExpense = 0,
+}) => {
+  // Only the regular spending pace is extended; one-off expenses are already in `expense`
+  const dailyAverage = dayOfMonth > 0 ? Math.max(expense - oneOffExpense, 0) / dayOfMonth : 0;
   const remainingExpense = expected
     ? Math.max(expected.expense, upcomingExpense)
     : dailyAverage * (totalDays - dayOfMonth) + upcomingExpense;
@@ -80,6 +101,7 @@ const calcForecast = ({ income, expense, dayOfMonth, totalDays, expected = null,
   return {
     basedOnHistory: Boolean(expected),
     dailyAverage: round2(dailyAverage),
+    oneOffExpense: expected ? 0 : round2(oneOffExpense),
     daysLeft: totalDays - dayOfMonth,
     projectedExpense: round2(projectedExpense),
     projectedIncome: round2(projectedIncome),
@@ -175,6 +197,7 @@ module.exports = {
   average,
   calcHealthScore,
   calcForecast,
+  sumOneOffExpenses,
   calcGoalProgress,
   calcSavingsPlan,
 };
