@@ -6,7 +6,7 @@ import { formatDate, formatMoney, formatTransactionAmount } from '../../utils/fo
 
 export default function TransactionTable({ transactions, onEdit, onDelete }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[720px]">
         <thead className="border-b border-line bg-surface/60">
           <tr>

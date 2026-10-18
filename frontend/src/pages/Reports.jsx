@@ -85,7 +85,7 @@ export default function Reports() {
               </Card>
 
               <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-                <Card title="פילוח הוצאות לפי קטגוריה">
+                <Card title="פילוח הוצאות לפי קטגוריה" className="min-w-0">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[480px]">
                       <thead>
