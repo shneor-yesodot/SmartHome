@@ -2,19 +2,26 @@ import { useEffect, useState } from 'react';
 import { formatHebrewDate } from '../../utils/hebrewDate';
 
 const gregorian = new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const time = new Intl.DateTimeFormat('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const time = new Intl.DateTimeFormat('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 /**
- * Hebrew date, Gregorian date and a ticking clock. Lives in its own component
- * so the per-second update re-renders only the clock, not the whole top bar.
+ * Hebrew date, Gregorian date and the time. Lives in its own component
+ * so the per-minute update re-renders only the clock, not the whole top bar.
  * Wide screens: one line. Narrower screens: the dates move under the time.
  */
 export default function LiveClock() {
   const [now, setNow] = useState(() => new Date());
 
+  // Tick on the minute boundary, so the clock changes exactly when the minute does
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    let id;
+    const tick = () => {
+      const date = new Date();
+      setNow(date);
+      id = setTimeout(tick, 60000 - (date.getSeconds() * 1000 + date.getMilliseconds()));
+    };
+    tick();
+    return () => clearTimeout(id);
   }, []);
 
   const hebrew = formatHebrewDate(now);
