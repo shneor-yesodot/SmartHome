@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import clsx from 'clsx';
-import { Loader2, ScanLine, X } from 'lucide-react';
+import { Loader2, Plus, ScanLine, X } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import TypeToggle from '../ui/TypeToggle';
@@ -11,7 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import { useAction } from '../../hooks/useAction';
 import { transactionService } from '../../services/transaction.service';
 import { receiptService } from '../../services/receipt.service';
-import { toInputDate, todayInput } from '../../utils/format';
+import { formatMoney, toInputDate, todayInput } from '../../utils/format';
 
 const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const MAX_RECEIPT_MB = 8;
@@ -30,26 +29,22 @@ const toForm = (t) => ({
 
 /** Create / edit a transaction. `transaction` is null when creating. */
 export default function TransactionForm({ open, transaction, onClose, onSaved }) {
-  const [wide, setWide] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} title={transaction ? 'עריכת עסקה' : 'עסקה חדשה'} size={wide ? 'lg' : 'md'}>
+    <Modal open={open} onClose={onClose} title={transaction ? 'עריכת עסקה' : 'עסקה חדשה'}>
       {/* The key resets the form state whenever a different transaction is opened */}
-      {open && (
-        <FormBody key={transaction?.id || 'new'} transaction={transaction} onClose={onClose} onSaved={onSaved} onWide={setWide} />
-      )}
+      {open && <FormBody key={transaction?.id || 'new'} transaction={transaction} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
 }
 
-function FormBody({ transaction, onClose, onSaved, onWide }) {
+function FormBody({ transaction, onClose, onSaved }) {
   const { byType } = useCategories();
   const toast = useToast();
   const { run, pending } = useAction();
   const [form, setForm] = useState(() => toForm(transaction));
   const [showProduct, setShowProduct] = useState(Boolean(transaction?.productName));
 
-  // Several products in one purchase (new expenses only)
-  const [multi, setMulti] = useState(false);
+  // A new expense can hold several products; each one is saved as its own transaction
   const [items, setItems] = useState([]);
   const [receipt, setReceipt] = useState(null); // scanned in this dialog, not saved yet
   const [scanning, setScanning] = useState(false);
@@ -60,14 +55,9 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const categories = byType(form.type);
-  const defaultCategory = (categories.find((c) => c.name === 'סופר ומזון') || categories[0])?.id || '';
-  const canSplit = !transaction && form.type === 'expense';
-  const basket = canSplit && multi;
-
-  useEffect(() => {
-    onWide(basket);
-    return () => onWide(false);
-  }, [basket, onWide]);
+  const defaultCategory = form.category || (categories.find((c) => c.name === 'סופר ומזון') || categories[0])?.id || '';
+  const canAddProducts = !transaction && form.type === 'expense';
+  const basket = items.length > 0;
 
   // A receipt scanned here but never saved is removed when the dialog closes
   useEffect(
@@ -77,18 +67,30 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
     []
   );
 
-  const startBasket = () => {
-    setMulti(true);
-    if (!items.length) {
-      setItems([
-        newItem({
-          name: form.productName || form.description,
-          total: form.amount,
-          quantity: form.quantity || 1,
-          category: form.category || defaultCategory,
-        }),
-      ]);
+  /** The first click turns what was typed so far into product 1 and adds product 2. */
+  const addProduct = () => {
+    if (basket) return setItems((list) => [...list, newItem({ category: defaultCategory })]);
+    setItems([
+      newItem({
+        name: (showProduct && form.productName) || form.description,
+        quantity: (showProduct && form.quantity) || 1,
+        total: form.amount,
+        category: defaultCategory,
+      }),
+      newItem({ category: defaultCategory }),
+    ]);
+  };
+
+  /** Back to a single product (typed by hand) - its details return to the regular fields. */
+  const changeItems = (next) => {
+    if (next.length === 0) return dropReceipt();
+    if (next.length === 1 && !receipt) {
+      const [only] = next;
+      setForm((f) => ({ ...f, amount: only.total, description: only.name || f.description, category: only.category || f.category }));
+      setItems([]);
+      return;
     }
+    setItems(next);
   };
 
   const pickReceipt = (file) => {
@@ -105,14 +107,14 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
     if (!ok) return;
     if (receipt) receiptService.remove(receipt.id).catch(() => {});
     setReceipt(result);
-    setMulti(true);
-    setForm((f) => ({ ...f, type: 'expense', merchant: result.merchant || f.merchant, date: toInputDate(result.purchaseDate) || f.date }));
+    setForm((f) => ({ ...f, merchant: result.merchant || f.merchant, date: toInputDate(result.purchaseDate) || f.date }));
     setItems(result.items.map((i) => newItem({ name: i.name, quantity: i.quantity, total: i.total, category: i.category || defaultCategory })));
   };
 
   const dropReceipt = () => {
     receiptService.remove(receipt.id).catch(() => {});
     setReceipt(null);
+    setItems([]);
   };
 
   const submitBasket = async () => {
@@ -169,32 +171,10 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {!receipt && <TypeToggle value={form.type} onChange={(type) => setForm((f) => ({ ...f, type, category: '' }))} />}
+      {!basket && <TypeToggle value={form.type} onChange={(type) => setForm((f) => ({ ...f, type, category: '' }))} />}
 
-      {canSplit && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex rounded-xl bg-surface p-1" role="radiogroup" aria-label="אופן הרישום">
-            {[
-              { value: false, label: 'סכום אחד' },
-              { value: true, label: 'כמה מוצרים' },
-            ].map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                role="radio"
-                aria-checked={multi === o.value}
-                disabled={Boolean(receipt)}
-                onClick={() => (o.value ? startBasket() : setMulti(false))}
-                className={clsx(
-                  'rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors',
-                  multi === o.value ? 'bg-white text-ink shadow-card' : 'text-ink-soft hover:text-ink'
-                )}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-
+      {canAddProducts && (
+        <div className="flex justify-end">
           <input
             ref={fileRef}
             type="file"
@@ -221,7 +201,7 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
       {receipt && (
         <div className="flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 text-sm">
           <p className="min-w-0 text-brand-700">
-            <b>זוהו {receipt.items.length} מוצרים</b> מהקבלה {receipt.originalName && <span className="truncate">({receipt.originalName})</span>}. בדקו ותקנו לפני השמירה.
+            <b>זוהו {receipt.items.length} מוצרים מהקבלה.</b> בדקו ותקנו לפני השמירה.
             {receipt.engine === 'demo' && <span className="block text-xs text-warn-600">מצב הדגמה: אין מפתח Gemini בשרת, ולכן מוצגים מוצרים לדוגמה.</span>}
           </p>
           <button type="button" className="icon-btn shrink-0" onClick={dropReceipt} aria-label="ביטול הקבלה">
@@ -236,7 +216,7 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
             {merchantField}
             {dateField}
           </div>
-          <BasketItems items={items} onChange={setItems} categories={categories} defaultCategory={defaultCategory} />
+          <BasketItems items={items} onChange={changeItems} categories={categories} />
         </>
       ) : (
         <>
@@ -288,6 +268,19 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
         </>
       )}
 
+      {canAddProducts && (
+        <div className="flex items-center justify-between gap-3">
+          <Button variant="secondary" size="sm" icon={Plus} onClick={addProduct}>
+            מוצר נוסף
+          </Button>
+          {basket && (
+            <p className="text-sm text-ink-soft">
+              {items.length} מוצרים · סה״כ <b className="tabular text-base text-ink">{formatMoney(basketTotal(items))}</b>
+            </p>
+          )}
+        </div>
+      )}
+
       {!receipt && (
         <Field label="הערות">
           <Input maxLength={500} value={form.notes} onChange={set('notes')} placeholder="לא חובה" />
@@ -298,7 +291,7 @@ function FormBody({ transaction, onClose, onSaved, onWide }) {
         <Button variant="secondary" onClick={onClose}>
           ביטול
         </Button>
-        <Button type="submit" loading={pending && !scanning} disabled={scanning || (basket && !(basketTotal(items) > 0))}>
+        <Button type="submit" loading={pending && !scanning} disabled={scanning}>
           {transaction ? 'שמירת שינויים' : basket ? `שמירת ${items.length} מוצרים` : 'הוספת עסקה'}
         </Button>
       </div>
