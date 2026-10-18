@@ -1,12 +1,30 @@
 const goalRepository = require('../repositories/goal.repository');
+const transactionRepository = require('../repositories/transaction.repository');
 const ApiError = require('../utils/ApiError');
-const { calcGoalProgress, round2 } = require('../utils/finance');
+const { monthRange, currentMonth } = require('../utils/dateUtils');
+const { calcGoalProgress, calcSavingsPlan, round2 } = require('../utils/finance');
 
 const decorate = (goal) => ({ ...goal.toJSON(), progress: calcGoalProgress(goal) });
 
-const list = async (userId) => {
-  const goals = await goalRepository.findAllByUser(userId, {}, { sort: { targetDate: 1 } });
-  return goals.map(decorate);
+/**
+ * Goals together with this month's savings plan: what is left after this
+ * month's expenses, and whether it covers what each goal still needs.
+ */
+const list = async (userId, now = new Date()) => {
+  const { year, month } = currentMonth(now);
+  const { from, to } = monthRange(year, month);
+  const [goals, totals] = await Promise.all([
+    goalRepository.findAllByUser(userId, {}, { sort: { targetDate: 1 } }),
+    transactionRepository.sumByType(userId, { date: { $gte: from, $lt: to } }),
+  ]);
+  const plan = calcSavingsPlan({ ...totals, goals, now });
+  return {
+    goals: goals.map((goal) => {
+      const item = decorate(goal);
+      return { ...item, progress: { ...item.progress, ...plan.goals[item.id] } };
+    }),
+    month: plan.month,
+  };
 };
 
 const getDocument = async (userId, id) => {

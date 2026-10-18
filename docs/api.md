@@ -58,7 +58,7 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/dashboard` | כל נתוני הדשבורד בבקשה אחת: סיכום, ניקוד בריאות, תחזית, 6 חודשים, פילוח קטגוריות, לוח יומי, תקציבים, יעדים, עסקאות אחרונות |
+| GET | `/dashboard` | כל נתוני הדשבורד בבקשה אחת: סיכום, ניקוד בריאות, תחזית, 6 חודשים, פילוח קטגוריות, לוח יומי, תקציבים, יעדים ו‑`savingsPlan` (כמו `meta.month` ביעדים), עסקאות אחרונות |
 | POST | `/dashboard/insights` | תובנות (Gemini, או מנוע כללים כשאין מפתח) |
 
 ## עסקאות – `/api/transactions`
@@ -97,11 +97,13 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/goals` | יעדים עם `progress`: `percent, expectedPercent, status, monthlyNeeded, daysLeft` |
+| GET | `/goals` | יעדים עם `progress`: `percent, expectedPercent, status, monthlyNeeded, daysLeft`, ולחודש הנוכחי `depositedThisMonth, leftThisMonth, affordable`. ב‑`meta.month`: `income, expense, deposited, free, needed, shortfall, status` (`covered / ok / short`) |
 | POST | `/goals` | `name, targetAmount, targetDate, initialAmount?, icon?, color?` |
 | PUT | `/goals/:id` | עדכון |
 | DELETE | `/goals/:id` | מחיקה |
 | POST | `/goals/:id/deposit` | `amount` (חיובי = הפקדה, שלילי = משיכה), `note?` |
+
+**הקשר להוצאות:** הכסף שנשאר החודש (הכנסות פחות הוצאות, ופחות מה שכבר הופקד ליעדים) מתחלק בין היעדים לפי תאריך היעד, הקרוב קודם. כל קנייה מקטינה את הסכום הזה. יעד שהכסף לא מספיק לו מסומן `affordable: false`.
 
 ## הוראות קבע – `/api/recurring`
 

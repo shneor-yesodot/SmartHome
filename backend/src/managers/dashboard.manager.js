@@ -15,12 +15,12 @@ const overview = async (userId, now = new Date()) => {
   const first = shiftMonth(year, month, -(MONTHS_IN_CHART - 1));
   const chartStart = monthRange(first.year, first.month).from;
 
-  const [transactions, allTime, recent, budgets, goals, upcoming] = await Promise.all([
+  const [transactions, allTime, recent, budgets, savings, upcoming] = await Promise.all([
     transactionRepository.findInRange(userId, chartStart, current.to, { populate: 'category' }),
     transactionRepository.sumByType(userId),
     transactionRepository.findAllByUser(userId, {}, { sort: { date: -1, createdAt: -1 }, limit: 6, populate: 'category' }),
     budgetManager.list(userId, { year, month }),
-    goalManager.list(userId),
+    goalManager.list(userId, now),
     recurringRepository.findUpcoming(userId, current.to),
   ]);
 
@@ -96,7 +96,8 @@ const overview = async (userId, now = new Date()) => {
     categories: breakdownByCategory(thisMonth, 'expense'),
     heatmap,
     budgets,
-    goals,
+    goals: savings.goals,
+    savingsPlan: savings.month,
     upcomingRecurring: pending.slice(0, 5).map((p) => ({
       id: String(p._id),
       description: p.description,

@@ -114,6 +114,58 @@ const calcGoalProgress = (goal, now = new Date()) => {
   };
 };
 
+const isInMonth = (date, now) => {
+  const d = new Date(date);
+  return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+};
+
+/**
+ * Links the goals to this month's cash flow. The money left after this month's
+ * expenses (and after what was already deposited to goals) is shared among the
+ * goals by target date, so every purchase lowers what the goals can still get.
+ *
+ * Returns the month figures and, per goal, how much it still needs this month
+ * and whether the remaining money covers it.
+ */
+const calcSavingsPlan = ({ income, expense, goals, now = new Date() }) => {
+  const perGoal = goals.map((goal) => {
+    const deposited = round2(
+      (goal.deposits || []).filter((d) => isInMonth(d.date, now)).reduce((s, d) => s + d.amount, 0)
+    );
+    const progress = calcGoalProgress(goal, now);
+    // What the goal asked for when the month started, minus what it already got
+    const plan =
+      progress.status === 'completed' || progress.status === 'overdue'
+        ? 0
+        : round2((progress.remaining + Math.max(deposited, 0)) / Math.max(progress.daysLeft / 30.44, 1));
+    return { id: String(goal._id || goal.id), targetDate: goal.targetDate, deposited, left: round2(Math.max(plan - deposited, 0)) };
+  });
+
+  const deposited = round2(perGoal.reduce((s, g) => s + g.deposited, 0));
+  const free = round2(income - expense - deposited);
+  const needed = round2(perGoal.reduce((s, g) => s + g.left, 0));
+
+  // Earliest target date gets the money first
+  let pool = Math.max(free, 0);
+  const goalsPlan = {};
+  [...perGoal]
+    .sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate))
+    .forEach((g) => {
+      const covered = round2(Math.min(pool, g.left));
+      pool = round2(pool - covered);
+      goalsPlan[g.id] = { depositedThisMonth: g.deposited, leftThisMonth: g.left, affordable: covered >= g.left };
+    });
+
+  let status = 'ok';
+  if (needed === 0) status = 'covered';
+  else if (free < needed) status = 'short';
+
+  return {
+    month: { income: round2(income), expense: round2(expense), deposited, free, needed, shortfall: round2(Math.max(needed - Math.max(free, 0), 0)), status },
+    goals: goalsPlan,
+  };
+};
+
 module.exports = {
   round2,
   clamp,
@@ -124,4 +176,5 @@ module.exports = {
   calcHealthScore,
   calcForecast,
   calcGoalProgress,
+  calcSavingsPlan,
 };

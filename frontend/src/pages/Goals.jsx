@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PiggyBank, Plus } from 'lucide-react';
+import { AlertTriangle, PiggyBank, Plus, Wallet } from 'lucide-react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
@@ -14,17 +14,18 @@ import { goalService } from '../services/goal.service';
 import { formatMoney } from '../utils/format';
 
 export default function Goals() {
-  const { data: goals, loading, error, reload } = useFetch(goalService.list, []);
+  const { data: result, loading, error, reload } = useFetch(goalService.list, []);
   const [editing, setEditing] = useState(undefined);
   const [depositing, setDepositing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const { run, pending } = useAction();
 
-  if (loading && !goals) return <PageLoader />;
+  if (loading && !result) return <PageLoader />;
   if (error) return <ErrorState message={error.message} onRetry={reload} />;
 
+  const goals = result.data;
+  const month = result.meta.month;
   const saved = goals.reduce((s, g) => s + g.currentAmount, 0);
-  const monthly = goals.reduce((s, g) => s + g.progress.monthlyNeeded, 0);
   const behind = goals.filter((g) => ['behind', 'overdue'].includes(g.progress.status)).length;
 
   const confirmDelete = async () => {
@@ -60,9 +61,33 @@ export default function Goals() {
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
             <StatCard label="נחסך בכל היעדים" value={formatMoney(saved, { round: true })} tone="success" icon={PiggyBank} />
-            <StatCard label="הפקדה חודשית נדרשת" value={formatMoney(monthly, { round: true })} />
-            <StatCard label="יעדים שמפגרים" value={behind} tone={behind ? 'warning' : 'success'} />
+            <StatCard
+              label="פנוי לחיסכון החודש"
+              value={formatMoney(month.free, { round: true })}
+              tone={month.free < 0 ? 'danger' : 'neutral'}
+              icon={Wallet}
+              footnote={`הכנסות ${formatMoney(month.income, { round: true })} פחות הוצאות ${formatMoney(month.expense, { round: true })}${
+                month.deposited ? ` ופחות ${formatMoney(month.deposited, { round: true })} שכבר הופקדו` : ''
+              }`}
+            />
+            <StatCard
+              label="היעדים צריכים עוד החודש"
+              value={formatMoney(month.needed, { round: true })}
+              tone={month.status === 'short' ? 'warning' : 'success'}
+              footnote={behind ? `${behind} יעדים מפגרים מהקצב` : undefined}
+            />
           </div>
+          {month.status === 'short' && (
+            <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl bg-warn-50 p-4 text-sm text-warn-600">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>
+                אחרי ההוצאות של החודש נשארו {formatMoney(Math.max(month.free, 0), { round: true })}, והיעדים צריכים עוד{' '}
+                {formatMoney(month.needed, { round: true })}. כדי לעמוד בקצב חסרים{' '}
+                <b className="tabular">{formatMoney(month.shortfall, { round: true })}</b>: צמצום הוצאות או דחיית תאריך
+                יעד.
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {goals.map((goal) => (
               <GoalCard key={goal.id} goal={goal} onDeposit={setDepositing} onEdit={setEditing} onDelete={setDeleting} />
