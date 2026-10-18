@@ -19,7 +19,6 @@ export default function SummaryCards({ summary }) {
         <p className={`tabular mt-1 text-4xl font-extrabold leading-tight sm:text-5xl ${negative ? 'text-danger-500' : 'text-ink'}`}>
           {formatMoney(summary.balance, { round: true })}
         </p>
-        <p className="mt-2 text-xs text-ink-muted">כל ההכנסות פחות כל ההוצאות, מכל החודשים</p>
 
         {summary.savedInGoals > 0 && (
           <dl className="tabular mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-x-8 gap-y-2 border-t border-line pt-4 text-sm sm:flex-row">
