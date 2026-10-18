@@ -1,0 +1,13 @@
+{
+  "name": "SmartHome demo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+  "postCreateCommand": "sh .devcontainer/setup.sh",
+  "postStartCommand": "sh .devcontainer/start.sh",
+  "forwardPorts": [5713],
+  "portsAttributes": {
+    "5713": { "label": "SmartHome", "onAutoForward": "silent" }
+  }
+}

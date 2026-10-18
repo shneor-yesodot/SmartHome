@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: 5173,
+      // A public Codespaces port (the demo link) is served from *.app.github.dev
+      allowedHosts: ['.app.github.dev'],
       // In development, /api calls are forwarded to the Node server (no CORS issues)
       proxy: { '/api': { target: env.VITE_PROXY_TARGET || 'http://localhost:5000', changeOrigin: true } },
     },
