@@ -69,13 +69,19 @@ const overview = async (userId, now = new Date()) => {
   const pending = upcoming.filter((p) => p.nextRun > now);
   const sumPending = (type) => pending.filter((p) => p.type === type).reduce((s, p) => s + p.amount, 0);
 
+  const balance = round2(allTime.income - allTime.expense);
+  const savedInGoals = round2(savings.goals.reduce((sum, g) => sum + g.currentAmount, 0));
+
   return {
     period: { year, month, day: now.getUTCDate(), totalDays },
     summary: {
       income: totals.income,
       expense: totals.expense,
       monthBalance: totals.balance,
-      balance: round2(allTime.income - allTime.expense),
+      balance,
+      // Money moved to savings goals is still yours, but no longer free to spend
+      savedInGoals,
+      available: round2(balance - savedInGoals),
     },
     health: calcHealthScore({
       income: totals.income,
