@@ -1,6 +1,6 @@
 import { PiggyBank, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import StatCard from '../ui/StatCard';
-import { formatMoney, formatSigned } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 
 /** The current balance first, centered and largest; this month's income and expenses below it. */
 export default function SummaryCards({ summary }) {
@@ -19,7 +19,7 @@ export default function SummaryCards({ summary }) {
         <p className={`tabular mt-1 text-4xl font-extrabold leading-tight sm:text-5xl ${negative ? 'text-danger-500' : 'text-ink'}`}>
           {formatMoney(summary.balance, { round: true })}
         </p>
-        <p className="tabular mt-2 text-sm text-ink-soft">מאזן החודש: {formatSigned(summary.monthBalance, { round: true })}</p>
+        <p className="mt-2 text-xs text-ink-muted">כל ההכנסות פחות כל ההוצאות, מכל החודשים</p>
 
         {summary.savedInGoals > 0 && (
           <dl className="tabular mx-auto mt-5 flex max-w-lg flex-col items-center justify-center gap-x-8 gap-y-2 border-t border-line pt-4 text-sm sm:flex-row">
