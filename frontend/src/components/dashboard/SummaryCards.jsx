@@ -1,4 +1,4 @@
-import { PiggyBank, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Coins, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import StatCard from '../ui/StatCard';
 import { formatMoney } from '../../utils/format';
 
@@ -28,7 +28,7 @@ export default function SummaryCards({ summary }) {
               <dd className={`font-bold ${summary.available < 0 ? 'text-danger-500' : ''}`}>{formatMoney(summary.available, { round: true })}</dd>
             </div>
             <div className="flex items-center gap-2">
-              <PiggyBank className="h-4 w-4 shrink-0 text-brand-600" />
+              <Coins className="h-4 w-4 shrink-0 text-brand-600" />
               <dt className="text-ink-soft">מתוכם ביעדי חיסכון:</dt>
               <dd className="font-bold">{formatMoney(summary.savedInGoals, { round: true })}</dd>
             </div>

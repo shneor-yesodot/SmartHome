@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PiggyBank } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import { ProgressBar } from '../ui/Progress';
@@ -12,7 +12,7 @@ export default function GoalsWidget({ goals, plan }) {
   return (
     <Card
       title="יעדי חיסכון"
-      icon={PiggyBank}
+      icon={Coins}
       action={
         <Link to="/goals" className="text-sm font-semibold text-brand-600 hover:underline">
           לכל היעדים

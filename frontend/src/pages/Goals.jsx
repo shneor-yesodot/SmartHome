@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, PiggyBank, Plus, Wallet } from 'lucide-react';
+import { AlertTriangle, Coins, Plus, Wallet } from 'lucide-react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
@@ -47,7 +47,7 @@ export default function Goals() {
       {goals.length === 0 ? (
         <div className="card">
           <EmptyState
-            icon={PiggyBank}
+            icon={Coins}
             title="עדיין לא הוגדרו יעדים"
             text="הגדירו למה אתם חוסכים, כמה צריך ועד מתי. נחשב כמה להפקיד בכל חודש ונראה אם אתם בקצב."
             action={
@@ -60,7 +60,7 @@ export default function Goals() {
       ) : (
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
-            <StatCard label="נחסך בכל היעדים" value={formatMoney(saved, { round: true })} tone="success" icon={PiggyBank} />
+            <StatCard label="נחסך בכל היעדים" value={formatMoney(saved, { round: true })} tone="success" icon={Coins} />
             <StatCard
               label="פנוי לחיסכון החודש"
               value={formatMoney(month.free, { round: true })}

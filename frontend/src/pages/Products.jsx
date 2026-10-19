@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, PiggyBank, ScanLine, Search, ShoppingBasket } from 'lucide-react';
+import { Coins, Package, ScanLine, Search, ShoppingBasket } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
 import { Input, Select } from '../components/ui/Field';
@@ -48,7 +48,7 @@ export default function Products() {
                 <StatCard
                   label="חיסכון אפשרי בסל"
                   value={formatMoney(stats.potentialSaving)}
-                  icon={PiggyBank}
+                  icon={Coins}
                   tone="success"
                   footnote="אם כל מוצר ייקנה במקום הזול ביותר שלו"
                 />
