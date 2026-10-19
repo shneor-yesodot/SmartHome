@@ -10,6 +10,7 @@ const toJSON = {
     delete ret.otp;
     delete ret.passwordReset;
     delete ret.googleId;
+    delete ret.fileData;
     return ret;
   },
 };

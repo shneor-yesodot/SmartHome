@@ -17,7 +17,7 @@ const savingsGoalSchema = new Schema(
     targetAmount: { type: Number, required: true, min: 1 },
     currentAmount: { type: Number, default: 0, min: 0 },
     targetDate: { type: Date, required: true },
-    icon: { type: String, default: 'PiggyBank' },
+    icon: { type: String, default: 'Coins' },
     color: { type: String, default: '#12A05C', match: /^#[0-9A-Fa-f]{6}$/ },
     deposits: { type: [depositSchema], default: [] },
   },
