@@ -15,8 +15,8 @@ const remove = asyncHandler(async (req, res) => {
   noContent(res);
 });
 const file = asyncHandler(async (req, res) => {
-  const { path, mimeType } = await receiptManager.getFile(req.user.id, req.params.id);
-  res.type(mimeType).sendFile(path);
+  const { data, mimeType } = await receiptManager.getFile(req.user.id, req.params.id);
+  res.type(mimeType).send(data);
 });
 
 module.exports = { list, scan, confirm, remove, file };

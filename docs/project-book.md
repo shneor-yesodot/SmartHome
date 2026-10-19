@@ -326,7 +326,7 @@ erDiagram
     RECEIPT {
         ObjectId _id PK
         ObjectId user FK
-        string fileName
+        binary fileData
         string mimeType
         string merchant
         date purchaseDate
@@ -347,7 +347,7 @@ erDiagram
 | `budgets` | תקרה חודשית לקטגוריה. `lastAlertKey` מונע שליחה כפולה של התראה | `user + category` (ייחודי) |
 | `recurringpayments` | הוראות קבע ומועד הביצוע הבא | `isActive + nextRun` |
 | `savingsgoals` | יעדי חיסכון. ההפקדות נשמרות כמערך מוטמע (embedded) | `user` |
-| `receipts` | מטא‑דאטה של קבלה והפריטים שזוהו. הקובץ עצמו נשמר בדיסק בשם אקראי | `user` |
+| `receipts` | מטא‑דאטה של קבלה והפריטים שזוהו. הקובץ המקורי נשמר במסמך עצמו (`fileData`, לא נשלף ברשימות), כך שהוא עובד גם בשרת בלי דיסק קבוע | `user` |
 
 ### 5.3 החלטות תכנון
 

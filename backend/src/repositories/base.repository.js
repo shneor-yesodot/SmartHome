@@ -24,9 +24,10 @@ class BaseRepository {
     return query.exec();
   }
 
-  findOneByUser(userId, id, { populate } = {}) {
+  findOneByUser(userId, id, { populate, select } = {}) {
     const query = this.model.findOne({ _id: id, user: userId });
     if (populate) query.populate(populate);
+    if (select) query.select(select);
     return query.exec();
   }
 
