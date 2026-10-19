@@ -13,7 +13,12 @@ export const GOAL_STATUS = {
   on_track: { label: 'בדרך הנכונה', tone: 'success' },
   behind: { label: 'מפגר מהיעד', tone: 'warning' },
   overdue: { label: 'התאריך עבר', tone: 'danger' },
+  at_risk: { label: 'בסיכון החודש', tone: 'warning' },
 };
+
+/** "On track" so far, but this month's expenses leave too little for the goal */
+export const goalStatus = (progress) =>
+  GOAL_STATUS[progress.status === 'on_track' && progress.affordable === false ? 'at_risk' : progress.status];
 
 export const BUDGET_STATUS = {
   ok: { label: 'בתוך התקציב', tone: 'success' },

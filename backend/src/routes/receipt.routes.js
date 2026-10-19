@@ -8,7 +8,7 @@ const { aiLimiter } = require('../middleware/rateLimiter');
 
 const router = Router();
 
-router.get('/', controller.list);
+router.get('/', validate(schema.listQuery, 'query'), controller.list);
 router.post('/scan', aiLimiter, receiptUpload, requireFile('receipt'), controller.scan);
 router.post('/:id/confirm', validate(idParam, 'params'), validate(schema.confirm), controller.confirm);
 router.get('/:id/file', validate(idParam, 'params'), controller.file);

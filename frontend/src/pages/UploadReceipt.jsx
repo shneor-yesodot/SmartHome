@@ -16,7 +16,7 @@ import { formatDate, formatMoney } from '../utils/format';
 export default function UploadReceipt() {
   const toast = useToast();
   const { run, pending } = useAction();
-  const history = useFetch(receiptService.list, []);
+  const history = useFetch(receiptService.recent, []);
   const [receipt, setReceipt] = useState(null); // scanned, waiting for review
   const [previewUrl, setPreviewUrl] = useState(null);
   const [savedCount, setSavedCount] = useState(null);
@@ -82,7 +82,15 @@ export default function UploadReceipt() {
             <ReceiptDropzone scanning={pending} onFile={scan} onInvalid={toast.error} />
           </div>
 
-          <Card title="קבלות אחרונות" icon={FileText}>
+          <Card
+            title="קבלות אחרונות"
+            icon={FileText}
+            action={
+              <Link to="/my-receipts" className="text-sm font-semibold text-brand-600 hover:underline">
+                לכל הקבלות
+              </Link>
+            }
+          >
             {!history.data?.length ? (
               <p className="py-6 text-center text-sm text-ink-muted">הקבלות שתעלו יופיעו כאן.</p>
             ) : (

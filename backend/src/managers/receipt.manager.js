@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const env = require('../config/env');
@@ -12,16 +11,8 @@ const { round2 } = require('../utils/finance');
 const { cleanText } = require('../utils/text');
 const demoReceipt = require('../seed/demoReceipt');
 
-const EXTENSIONS = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'application/pdf': '.pdf' };
+// Receipts uploaded before the files moved into the database are still on disk
 const receiptsDir = () => path.resolve(env.uploadDir, 'receipts');
-
-/** Stores the file under a random name - the original file name is never used on disk. */
-const saveFile = async (file) => {
-  await fs.mkdir(receiptsDir(), { recursive: true });
-  const fileName = `${crypto.randomUUID()}${EXTENSIONS[file.mimetype]}`;
-  await fs.writeFile(path.join(receiptsDir(), fileName), file.buffer);
-  return fileName;
-};
 
 const toNumber = (value, fallback = 0) => {
   const n = Number(value);
@@ -59,7 +50,7 @@ const scan = async (userId, file) => {
   const purchaseDate = new Date(parsed.date);
   const receipt = await receiptRepository.create(userId, {
     originalName: cleanText(file.originalname).slice(0, 120),
-    fileName: await saveFile(file),
+    fileData: file.buffer,
     mimeType: file.mimetype,
     size: file.size,
     merchant: cleanText(parsed.merchant).slice(0, 80),
@@ -77,17 +68,7 @@ const confirm = async (userId, id, { merchant, date, items }) => {
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
   if (receipt.status === 'confirmed') throw ApiError.conflict('הקבלה הזו כבר נשמרה כעסקאות');
 
-  const rows = items.map((item) => ({
-    type: 'expense',
-    amount: item.total,
-    category: item.category,
-    description: item.name,
-    productName: item.name,
-    quantity: item.quantity,
-    unitPrice: round2(item.total / item.quantity),
-    merchant,
-    date,
-  }));
+  const rows = transactionManager.itemsToRows({ merchant, date, items });
   const transactions = await transactionManager.bulkCreate(userId, rows, {
     source: 'receipt',
     extra: { receipt: receipt._id },
@@ -105,19 +86,33 @@ const confirm = async (userId, id, { merchant, date, items }) => {
   return { receipt, created: transactions.length };
 };
 
-const list = (userId) => receiptRepository.findAllByUser(userId, {}, { sort: { createdAt: -1 }, limit: 30 });
+/** Newest first, with the category of every product line. */
+const list = async (userId, { page = 1, limit = 20 } = {}) => {
+  const [items, total] = await Promise.all([
+    receiptRepository.findAllByUser(userId, {}, {
+      sort: { createdAt: -1 },
+      skip: (page - 1) * limit,
+      limit,
+      populate: { path: 'items.category', select: 'name icon color' },
+    }),
+    receiptRepository.countByUser(userId),
+  ]);
+  return { items, pagination: { page, limit, total, pages: Math.max(Math.ceil(total / limit), 1) } };
+};
 
 const remove = async (userId, id) => {
   const receipt = await receiptRepository.deleteByUser(userId, id);
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
-  await fs.unlink(path.join(receiptsDir(), receipt.fileName)).catch(() => {});
+  if (receipt.fileName) await fs.unlink(path.join(receiptsDir(), receipt.fileName)).catch(() => {});
 };
 
-/** Absolute path of the stored file, after verifying ownership. */
+/** The stored file's content, after verifying ownership. */
 const getFile = async (userId, id) => {
-  const receipt = await receiptRepository.findOneByUser(userId, id);
+  const receipt = await receiptRepository.findOneByUser(userId, id, { select: '+fileData' });
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
-  return { path: path.join(receiptsDir(), receipt.fileName), mimeType: receipt.mimeType };
+  const data = receipt.fileData || (receipt.fileName && (await fs.readFile(path.join(receiptsDir(), receipt.fileName)).catch(() => null)));
+  if (!data) throw ApiError.notFound('הקובץ המקורי של הקבלה לא נמצא');
+  return { data, mimeType: receipt.mimeType };
 };
 
 module.exports = { scan, confirm, list, remove, getFile };

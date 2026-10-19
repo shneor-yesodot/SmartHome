@@ -53,7 +53,7 @@ export default function Dashboard() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <ForecastCard forecast={data.forecast} upcoming={data.upcomingRecurring} />
-          <GoalsWidget goals={data.goals} />
+          <GoalsWidget goals={data.goals} plan={data.savingsPlan} />
           <SpendingHeatmap heatmap={data.heatmap} period={data.period} />
         </div>
 

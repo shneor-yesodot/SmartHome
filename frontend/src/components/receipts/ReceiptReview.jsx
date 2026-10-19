@@ -6,7 +6,8 @@ import { useCategories } from '../../context/CategoriesContext';
 import { formatMoney, toInputDate } from '../../utils/format';
 
 let rowId = 0;
-const withKey = (item) => ({ ...item, key: `row-${(rowId += 1)}` });
+// From the receipts list the category arrives populated ({ id, name }); the form needs the id
+const withKey = (item) => ({ ...item, category: item.category?.id || item.category || null, key: `row-${(rowId += 1)}` });
 
 /** The user checks and fixes what the AI read, before anything is saved. */
 export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, onCancel }) {

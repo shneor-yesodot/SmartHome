@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BarChart3, ChevronLeft, ChevronRight, Percent, PiggyBank, TrendingDown, TrendingUp } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Coins, Percent, TrendingDown, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
@@ -57,7 +57,7 @@ export default function Reports() {
             <StatCard
               label="חיסכון"
               value={formatMoney(data.totals.savings, { round: true })}
-              icon={PiggyBank}
+              icon={Coins}
               tone={data.totals.savings < 0 ? 'danger' : 'neutral'}
               footnote={`בחודש הקודם: ${formatMoney(data.previous.savings, { round: true })}`}
             />
@@ -85,7 +85,7 @@ export default function Reports() {
               </Card>
 
               <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-                <Card title="פילוח הוצאות לפי קטגוריה">
+                <Card title="פילוח הוצאות לפי קטגוריה" className="min-w-0">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[480px]">
                       <thead>

@@ -58,7 +58,7 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/dashboard` | כל נתוני הדשבורד בבקשה אחת: סיכום, ניקוד בריאות, תחזית, 6 חודשים, פילוח קטגוריות, לוח יומי, תקציבים, יעדים, עסקאות אחרונות |
+| GET | `/dashboard` | כל נתוני הדשבורד בבקשה אחת: סיכום (`income, expense, monthBalance, balance, savedInGoals, available`; `available` = היתרה פחות הכסף שהופקד ליעדים), ניקוד בריאות, תחזית, 6 חודשים, פילוח קטגוריות, לוח יומי, תקציבים, יעדים ו‑`savingsPlan` (כמו `meta.month` ביעדים), עסקאות אחרונות |
 | POST | `/dashboard/insights` | תובנות (Gemini, או מנוע כללים כשאין מפתח) |
 
 ## עסקאות – `/api/transactions`
@@ -74,6 +74,7 @@
 | GET | `/transactions/import/template` | הורדת קובץ תבנית ליבוא |
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
 | POST | `/transactions/bulk` | יצירה גורפת: `rows[]` (עד 1000) |
+| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת |
 
 ## קטגוריות – `/api/categories`
 
@@ -97,11 +98,13 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/goals` | יעדים עם `progress`: `percent, expectedPercent, status, monthlyNeeded, daysLeft` |
+| GET | `/goals` | יעדים עם `progress`: `percent, expectedPercent, status, monthlyNeeded, daysLeft`, ולחודש הנוכחי `depositedThisMonth, leftThisMonth, affordable`. ב‑`meta.month`: `income, expense, deposited, free, needed, shortfall, status` (`covered / ok / short`) |
 | POST | `/goals` | `name, targetAmount, targetDate, initialAmount?, icon?, color?` |
 | PUT | `/goals/:id` | עדכון |
 | DELETE | `/goals/:id` | מחיקה |
 | POST | `/goals/:id/deposit` | `amount` (חיובי = הפקדה, שלילי = משיכה), `note?` |
+
+**הקשר להוצאות:** הכסף שנשאר החודש (הכנסות פחות הוצאות, ופחות מה שכבר הופקד ליעדים) מתחלק בין היעדים לפי תאריך היעד, הקרוב קודם. כל קנייה מקטינה את הסכום הזה. יעד שהכסף לא מספיק לו מסומן `affordable: false`.
 
 ## הוראות קבע – `/api/recurring`
 
@@ -124,7 +127,7 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/receipts` | 30 הקבלות האחרונות |
+| GET | `/receipts?page=&limit=` | הקבלות, מהחדשה לישנה, עם הקטגוריה של כל מוצר. `meta.pagination` כמו בעסקאות (ברירת מחדל 20 לעמוד) |
 | POST | `/receipts/scan` | העלאת תמונה / PDF (שדה `file`), פענוח ב‑Gemini, מחזיר שורות מוצר לבדיקה |
 | POST | `/receipts/:id/confirm` | `merchant, date, items[]` – כל פריט נשמר כעסקה נפרדת |
 | GET | `/receipts/:id/file` | הקובץ המקורי (לבעלים בלבד) |

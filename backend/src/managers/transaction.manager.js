@@ -169,4 +169,36 @@ const previewImport = async (userId, file) => {
   };
 };
 
-module.exports = { list, getById, create, update, remove, bulkCreate, exportToExcel, previewImport };
+/** Product lines of one purchase (manual basket or receipt) as expense rows. */
+const itemsToRows = ({ merchant, date, notes, items }) =>
+  items.map((item) => ({
+    type: 'expense',
+    amount: item.total,
+    category: item.category,
+    description: item.name,
+    productName: item.name,
+    quantity: item.quantity,
+    unitPrice: round2(item.total / item.quantity),
+    merchant,
+    date,
+    ...(notes ? { notes } : {}),
+  }));
+
+/** A purchase with several products, entered by hand - one transaction per product. */
+const createBasket = async (userId, basket) => {
+  const transactions = await bulkCreate(userId, itemsToRows(basket), { source: 'manual' });
+  return { created: transactions.length, total: round2(basket.items.reduce((s, i) => s + i.total, 0)) };
+};
+
+module.exports = {
+  list,
+  getById,
+  create,
+  update,
+  remove,
+  bulkCreate,
+  itemsToRows,
+  createBasket,
+  exportToExcel,
+  previewImport,
+};

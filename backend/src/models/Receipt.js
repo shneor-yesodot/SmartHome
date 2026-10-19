@@ -16,7 +16,10 @@ const receiptSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     originalName: { type: String, trim: true },
-    fileName: { type: String, required: true }, // random name on disk
+    // The original file is kept in the database, so it works on hosts without a
+    // lasting disk (e.g. Vercel). Older receipts still have it on disk under fileName.
+    fileData: { type: Buffer, select: false },
+    fileName: String,
     mimeType: { type: String, required: true },
     size: Number,
     merchant: { type: String, trim: true, default: '' },

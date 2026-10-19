@@ -4,7 +4,7 @@ const budgetManager = require('./budget.manager');
 const goalManager = require('./goal.manager');
 const { breakdownByCategory } = require('./report.manager');
 const { monthRange, currentMonth, shiftMonth, daysInMonth, monthKey, dayKey } = require('../utils/dateUtils');
-const { round2, average, totalsByType, calcHealthScore, calcForecast } = require('../utils/finance');
+const { round2, average, totalsByType, calcHealthScore, calcForecast, sumOneOffExpenses } = require('../utils/finance');
 
 const MONTHS_IN_CHART = 6;
 
@@ -15,12 +15,12 @@ const overview = async (userId, now = new Date()) => {
   const first = shiftMonth(year, month, -(MONTHS_IN_CHART - 1));
   const chartStart = monthRange(first.year, first.month).from;
 
-  const [transactions, allTime, recent, budgets, goals, upcoming] = await Promise.all([
+  const [transactions, allTime, recent, budgets, savings, upcoming] = await Promise.all([
     transactionRepository.findInRange(userId, chartStart, current.to, { populate: 'category' }),
     transactionRepository.sumByType(userId),
     transactionRepository.findAllByUser(userId, {}, { sort: { date: -1, createdAt: -1 }, limit: 6, populate: 'category' }),
     budgetManager.list(userId, { year, month }),
-    goalManager.list(userId),
+    goalManager.list(userId, now),
     recurringRepository.findUpcoming(userId, current.to),
   ]);
 
@@ -69,13 +69,19 @@ const overview = async (userId, now = new Date()) => {
   const pending = upcoming.filter((p) => p.nextRun > now);
   const sumPending = (type) => pending.filter((p) => p.type === type).reduce((s, p) => s + p.amount, 0);
 
+  const balance = round2(allTime.income - allTime.expense);
+  const savedInGoals = round2(savings.goals.reduce((sum, g) => sum + g.currentAmount, 0));
+
   return {
     period: { year, month, day: now.getUTCDate(), totalDays },
     summary: {
       income: totals.income,
       expense: totals.expense,
       monthBalance: totals.balance,
-      balance: round2(allTime.income - allTime.expense),
+      balance,
+      // Money moved to savings goals is still yours, but no longer free to spend
+      savedInGoals,
+      available: round2(balance - savedInGoals),
     },
     health: calcHealthScore({
       income: totals.income,
@@ -91,12 +97,14 @@ const overview = async (userId, now = new Date()) => {
       expected,
       upcomingIncome: sumPending('income'),
       upcomingExpense: sumPending('expense'),
+      oneOffExpense: sumOneOffExpenses(thisMonth.filter((t) => t.type === 'expense').map((t) => t.amount)),
     }),
     monthly,
     categories: breakdownByCategory(thisMonth, 'expense'),
     heatmap,
     budgets,
-    goals,
+    goals: savings.goals,
+    savingsPlan: savings.month,
     upcomingRecurring: pending.slice(0, 5).map((p) => ({
       id: String(p._id),
       description: p.description,
