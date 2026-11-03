@@ -154,9 +154,10 @@ const logout = async ({ refreshToken }) => {
 };
 
 /** Only the whitelisted fields (validated by Joi) can be changed - never e-mail or role. */
-const updateProfile = async (userId, { name, notifications }) => {
+const updateProfile = async (userId, { name, notifications, calendar }) => {
   const user = await userRepository.findById(userId);
   if (name) user.name = name;
+  if (calendar) user.calendar = calendar;
   if (notifications) Object.assign(user.notifications, notifications);
   return user.save();
 };

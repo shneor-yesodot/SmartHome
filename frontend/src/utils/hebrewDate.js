@@ -20,3 +20,24 @@ export const formatHebrewDate = (date) => {
   const parts = Object.fromEntries(hebrewParts.formatToParts(date).map((p) => [p.type, p.value]));
   return `${toHebrewNumeral(Number(parts.day))} ב${parts.month} ${toHebrewNumeral(Number(parts.year) % 1000)}`;
 };
+
+// ---- Months in either calendar (the server sends the month range; these only format) ----
+
+const hebrewDayMonth = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+const hebrewMonthName = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long' });
+
+/** Day number as shown in a month grid: 7 or ז׳ */
+export const dayNumber = (day, calendar) => (calendar === 'hebrew' ? toHebrewNumeral(day) : String(day));
+
+/** A day inside a month view: "07/11" or "ז׳ חשוון". Dates from the server are UTC days. */
+export const formatDay = (date, calendar) => {
+  if (calendar !== 'hebrew') {
+    return new Date(date).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  }
+  const parts = Object.fromEntries(hebrewDayMonth.formatToParts(new Date(date)).map((p) => [p.type, p.value]));
+  return `${toHebrewNumeral(Number(parts.day))} ${parts.month}`;
+};
+
+/** Name of the current month in the given calendar, e.g. "נובמבר" or "חשוון". */
+export const currentMonthName = (calendar, now = new Date()) =>
+  calendar === 'hebrew' ? hebrewMonthName.format(now) : now.toLocaleDateString('he-IL', { month: 'long' });

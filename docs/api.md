@@ -49,10 +49,21 @@
 | GET | `/auth/google` | הפניה להתחברות עם Google (`?returnTo=/path`) | – |
 | GET | `/auth/google/callback` | חזרה מ‑Google. הטוקנים חוזרים ב‑fragment אל `/oauth-callback` | – |
 | GET | `/auth/me` 🔒 | המשתמש המחובר | – |
-| PATCH | `/auth/me` 🔒 | עדכון שם והעדפות התראה | `name?, notifications?` |
+| PATCH | `/auth/me` 🔒 | עדכון שם, העדפות התראה ולוח שנה | `name?, notifications?, calendar?` (`gregorian` / `hebrew`) |
 | PUT | `/auth/password` 🔒 | החלפת סיסמה: מבטל את שאר הסשנים ומחזיר סשן חדש | `currentPassword, newPassword` |
 
 🔒 = דורש התחברות. כל הנתיבים שמכאן והלאה דורשים התחברות.
+
+## חודשים עבריים ולועזיים
+
+כל מה שמחושב לפי חודש (דשבורד, תקציבים, יעדים, תובנות ודוחות) נספר לפי הגדרת המשתמש `calendar`: חודש לועזי או חודש עברי (למשל חשוון תשפ״ז, 12.10–10.11.2026). הטווחים מחושבים בשרת עם לוח השנה העברי של Intl, בלי ספרייה חיצונית.
+
+בדוחות ובתקציבים אפשר לבקש חודש מסוים:
+- `calendar=gregorian|hebrew` (ברירת מחדל: הגדרת המשתמש)
+- `date=YYYY-MM-DD`: כל יום בתוך החודש המבוקש
+- או `year=&month=` (`month` מ‑0 עד 11): תמיד חודש לועזי
+
+בתשובה מופיע `period`: `{ calendar, name, label, start, end, days, key }`, למשל `label: "חשוון תשפ״ז"`, ו‑`end` הוא היום האחרון בחודש.
 
 ## דשבורד – `/api/dashboard`
 
@@ -89,7 +100,7 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/budgets?year=&month=` | תקציבים עם `spent, remaining, percent, status` לחודש המבוקש |
+| GET | `/budgets?calendar=&date=` | תקציבים עם `spent, remaining, percent, status` לחודש המבוקש (ברירת מחדל: החודש הנוכחי בלוח של המשתמש) |
 | POST | `/budgets` | `category, amount, alertThreshold?` (תקציב אחד לקטגוריה) |
 | PUT | `/budgets/:id` | `amount?, alertThreshold?` |
 | DELETE | `/budgets/:id` | מחיקה |
@@ -137,7 +148,8 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/reports/monthly?year=&month=` | סיכום חודשי, השוואה לחודש הקודם, סדרה יומית, פילוח קטגוריות, בתי עסק מובילים. `month` מ‑0 עד 11 |
+| GET | `/reports/monthly?calendar=&date=` | חודש לועזי או עברי: סיכום, השוואה לחודש הקודם, סדרה יומית, פילוח קטגוריות, בתי עסק מובילים, ו‑`summary` במבנה של טבלת סיכום ביתית (הכנסות, הוצאות שוטפות, הוראות קבע, מאזן) |
+| GET | `/reports/periods?calendar=&count=12` | החודשים האחרונים (מהחדש לישן) לבחירת חודש בסינון |
 
 ## בדיקת תקינות
 

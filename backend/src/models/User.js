@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { USER_ROLES } = require('../config/constants');
+const { USER_ROLES, CALENDARS } = require('../config/constants');
 const { baseOptions } = require('./plugins');
 
 const SALT_ROUNDS = 12;
@@ -15,6 +15,8 @@ const userSchema = new Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     role: { type: String, enum: USER_ROLES, default: 'user' },
     currency: { type: String, default: 'ILS' },
+    // Which months the dashboard, budgets and reports are counted by
+    calendar: { type: String, enum: CALENDARS, default: 'gregorian' },
     emailVerified: { type: Boolean, default: false },
     googleId: { type: String, index: { unique: true, sparse: true }, select: false },
     notifications: {

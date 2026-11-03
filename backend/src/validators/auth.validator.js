@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const { CALENDARS } = require('../config/constants');
 
 const password = () =>
   Joi.string()
@@ -22,6 +23,7 @@ const login = Joi.object({
 const updateProfile = Joi.object({
   name: Joi.string().trim().min(2).max(60).label('שם מלא'),
   notifications: Joi.object({ budgetAlerts: Joi.boolean(), monthlySummary: Joi.boolean() }),
+  calendar: Joi.string().valid(...CALENDARS),
 }).min(1);
 
 const changePassword = Joi.object({

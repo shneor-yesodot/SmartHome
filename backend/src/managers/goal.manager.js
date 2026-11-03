@@ -1,7 +1,7 @@
 const goalRepository = require('../repositories/goal.repository');
 const transactionRepository = require('../repositories/transaction.repository');
 const ApiError = require('../utils/ApiError');
-const { monthRange, currentMonth } = require('../utils/dateUtils');
+const { periodOf } = require('../utils/period');
 const { calcGoalProgress, calcSavingsPlan, round2 } = require('../utils/finance');
 
 const decorate = (goal) => ({ ...goal.toJSON(), progress: calcGoalProgress(goal) });
@@ -10,9 +10,8 @@ const decorate = (goal) => ({ ...goal.toJSON(), progress: calcGoalProgress(goal)
  * Goals together with this month's savings plan: what is left after this
  * month's expenses, and whether it covers what each goal still needs.
  */
-const list = async (userId, now = new Date()) => {
-  const { year, month } = currentMonth(now);
-  const { from, to } = monthRange(year, month);
+const list = async (userId, { now = new Date(), calendar = 'gregorian' } = {}) => {
+  const { from, to } = periodOf(now, calendar);
   const [goals, totals] = await Promise.all([
     goalRepository.findAllByUser(userId, {}, { sort: { targetDate: 1 } }),
     transactionRepository.sumByType(userId, { date: { $gte: from, $lt: to } }),

@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { ok, created, noContent } = require('../utils/response');
 
 const list = asyncHandler(async (req, res) => {
-  const { goals, month } = await goalManager.list(req.user.id);
+  const { goals, month } = await goalManager.list(req.user.id, { calendar: req.user.calendar });
   ok(res, goals, { month });
 });
 const create = asyncHandler(async (req, res) => created(res, await goalManager.create(req.user.id, req.body)));

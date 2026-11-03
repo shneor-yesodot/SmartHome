@@ -4,7 +4,7 @@ const userRepository = require('../repositories/user.repository');
 const categoryManager = require('./category.manager');
 const emailService = require('../services/email.service');
 const ApiError = require('../utils/ApiError');
-const { monthRange, currentMonth, monthKey } = require('../utils/dateUtils');
+const { periodOf } = require('../utils/period');
 const { round2, percentOf } = require('../utils/finance');
 
 /** Adds usage figures to a budget document. */
@@ -22,10 +22,9 @@ const decorate = (budget, spent) => {
   };
 };
 
-/** Budgets with the amount spent in the requested month (defaults to the current one). */
-const list = async (userId, { year, month } = {}) => {
-  const period = year !== undefined && month !== undefined ? { year, month } : currentMonth();
-  const { from, to } = monthRange(period.year, period.month);
+/** Budgets with the amount spent in the given month - Gregorian or Hebrew (defaults to the current one). */
+const list = async (userId, period = periodOf()) => {
+  const { from, to } = period;
 
   const [budgets, sums] = await Promise.all([
     budgetRepository.findAllByUser(userId, {}, { populate: 'category', sort: { createdAt: 1 } }),
@@ -66,8 +65,8 @@ const checkAlerts = async (userId, categoryId) => {
   const budget = await budgetRepository.findByCategory(userId, categoryId);
   if (!budget || !budget.category) return null;
 
-  const { year, month } = currentMonth();
-  const { from, to } = monthRange(year, month);
+  const user = await userRepository.findById(userId);
+  const { from, to, key } = periodOf(new Date(), user?.calendar);
   const [row] = (await transactionRepository.sumByCategory(userId, { from, to, type: 'expense' })).filter(
     (r) => String(r._id) === String(categoryId)
   );
@@ -77,14 +76,13 @@ const checkAlerts = async (userId, categoryId) => {
   const level = percent >= 100 ? 'exceeded' : percent >= budget.alertThreshold ? 'warning' : null;
   if (!level) return null;
 
-  const alertKey = `${monthKey(from)}:${level}`;
-  const alreadySent = budget.lastAlertKey === alertKey || budget.lastAlertKey === `${monthKey(from)}:exceeded`;
+  const alertKey = `${key}:${level}`;
+  const alreadySent = budget.lastAlertKey === alertKey || budget.lastAlertKey === `${key}:exceeded`;
   if (alreadySent) return null;
 
   budget.lastAlertKey = alertKey;
   await budget.save();
 
-  const user = await userRepository.findById(userId);
   if (user?.notifications?.budgetAlerts) {
     await emailService.sendBudgetAlert(user, {
       categoryName: budget.category.name,

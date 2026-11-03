@@ -1,6 +1,7 @@
 import { CalendarDays } from 'lucide-react';
 import Card from '../ui/Card';
 import { formatMoney } from '../../utils/format';
+import { dayNumber, formatDay } from '../../utils/hebrewDate';
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 // Light -> dark green, by share of the busiest day
@@ -11,10 +12,10 @@ const shadeFor = (total, max) => {
   return SHADES[Math.min(Math.ceil((total / max) * 5), 5)];
 };
 
-/** Calendar of the current month - the darker the day, the more was spent. */
+/** Calendar of the current month (Gregorian or Hebrew) - the darker the day, the more was spent. */
 export default function SpendingHeatmap({ heatmap, period }) {
   const max = Math.max(...heatmap.map((d) => d.total), 1);
-  const leadingBlanks = new Date(Date.UTC(period.year, period.month, 1)).getUTCDay(); // Sunday = 0
+  const leadingBlanks = new Date(period.start).getUTCDay(); // Sunday = 0
 
   return (
     <Card title="לוח הוצאות יומי" icon={CalendarDays}>
@@ -33,11 +34,11 @@ export default function SpendingHeatmap({ heatmap, period }) {
           return (
             <span
               key={d.day}
-              title={`${d.day}/${period.month + 1}: ${formatMoney(d.total)}`}
+              title={`${formatDay(d.date, period.calendar)}: ${formatMoney(d.total)}`}
               className={`tabular flex aspect-square items-center justify-center rounded-lg text-xs ${level >= 4 ? 'text-white' : 'text-ink-soft'} ${isToday ? 'ring-2 ring-ink/60' : ''}`}
               style={{ backgroundColor: SHADES[level] }}
             >
-              {d.day}
+              {dayNumber(d.day, period.calendar)}
             </span>
           );
         })}

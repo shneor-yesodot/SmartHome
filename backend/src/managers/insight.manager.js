@@ -5,29 +5,28 @@ const productManager = require('./product.manager');
 const { breakdownByCategory } = require('./report.manager');
 const geminiService = require('../services/gemini.service');
 const logger = require('../utils/logger');
-const { monthRange, currentMonth, shiftMonth } = require('../utils/dateUtils');
+const { periodOf, shiftPeriod, dayOfPeriod } = require('../utils/period');
 const { totalsByType, percentChange, round2 } = require('../utils/finance');
 
 const money = (n) => `${Math.round(n).toLocaleString('he-IL')} ₪`;
 const ALLOWED_TYPES = ['positive', 'warning', 'tip'];
 
 /** Aggregated figures only - no names, merchants or free text are sent to the AI. */
-const buildSummary = async (userId) => {
-  const { year, month } = currentMonth();
-  const prev = shiftMonth(year, month, -1);
-  const current = monthRange(year, month);
-  const previous = monthRange(prev.year, prev.month);
+const buildSummary = async (userId, calendar = 'gregorian') => {
+  const now = new Date();
+  const current = periodOf(now, calendar);
+  const previous = shiftPeriod(current, -1);
 
   const [thisMonth, lastMonth, budgets, savings, catalogue] = await Promise.all([
     transactionRepository.findInRange(userId, current.from, current.to, { populate: 'category' }),
     transactionRepository.findInRange(userId, previous.from, previous.to, { populate: 'category' }),
-    budgetManager.list(userId, { year, month }),
-    goalManager.list(userId),
+    budgetManager.list(userId, current),
+    goalManager.list(userId, { now, calendar }),
     productManager.list(userId),
   ]);
 
   return {
-    dayOfMonth: new Date().getUTCDate(),
+    dayOfMonth: dayOfPeriod(now, current),
     thisMonth: totalsByType(thisMonth),
     lastMonth: totalsByType(lastMonth),
     topCategories: breakdownByCategory(thisMonth, 'expense').slice(0, 5).map(({ name, total, percent }) => ({ name, total, percent })),
@@ -70,8 +69,8 @@ const ruleBasedInsights = (s) => {
   return insights.slice(0, 5);
 };
 
-const generate = async (userId) => {
-  const summary = await buildSummary(userId);
+const generate = async (userId, calendar) => {
+  const summary = await buildSummary(userId, calendar);
   let source = 'rules';
   let insights = ruleBasedInsights(summary);
 

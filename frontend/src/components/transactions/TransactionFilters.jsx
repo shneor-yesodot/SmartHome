@@ -1,6 +1,10 @@
 import { Search, X } from 'lucide-react';
 import { Input, Select } from '../ui/Field';
 import { useCategories } from '../../context/CategoriesContext';
+import { useFetch } from '../../hooks/useFetch';
+import { reportService } from '../../services/report.service';
+
+const isoDay = (date) => date.slice(0, 10);
 
 export const EMPTY_FILTERS = { search: '', type: '', category: '', from: '', to: '' };
 
@@ -10,8 +14,16 @@ export default function TransactionFilters({ filters, onChange }) {
   const visibleCategories = filters.type ? categories.filter((c) => c.type === filters.type) : categories;
   const isFiltered = Object.values(filters).some(Boolean);
 
+  // A month (Gregorian or Hebrew, by the user's setting) fills in the date range
+  const { data: periods } = useFetch(() => reportService.periods(), []);
+  const month = periods?.find((p) => isoDay(p.start) === filters.from && isoDay(p.end) === filters.to)?.key || '';
+  const pickMonth = (key) => {
+    const p = periods.find((item) => item.key === key);
+    onChange({ ...filters, from: p ? isoDay(p.start) : '', to: p ? isoDay(p.end) : '' });
+  };
+
   return (
-    <div className="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1.2fr_1fr_1fr_auto]">
+    <div className="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.2fr_1.2fr_1fr_1fr_auto]">
       <div className="relative">
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
         <Input className="ps-9" value={filters.search} onChange={set('search')} placeholder="חיפוש לפי תיאור, עסק או מוצר" aria-label="חיפוש" />
@@ -27,6 +39,14 @@ export default function TransactionFilters({ filters, onChange }) {
           <option key={c.id} value={c.id}>
             {c.name}
             {!filters.type ? (c.type === 'income' ? ' (הכנסה)' : '') : ''}
+          </option>
+        ))}
+      </Select>
+      <Select value={month} onChange={(e) => pickMonth(e.target.value)} aria-label="חודש">
+        <option value="">כל החודשים</option>
+        {periods?.map((p) => (
+          <option key={p.key} value={p.key}>
+            {p.label}
           </option>
         ))}
       </Select>

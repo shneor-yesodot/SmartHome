@@ -1,7 +1,7 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../ui/Card';
 import { CHART_COLORS } from '../../constants/options';
-import { HEBREW_MONTHS, formatMoney } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 
 export function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -21,7 +21,7 @@ export function ChartTooltip({ active, payload, label }) {
 export const axisProps = { tick: { fill: CHART_COLORS.axis, fontSize: 12 }, axisLine: false, tickLine: false };
 
 export default function IncomeExpenseChart({ monthly }) {
-  const data = monthly.map((m) => ({ name: HEBREW_MONTHS[m.month], income: m.income, expense: m.expense }));
+  const data = monthly.map((m) => ({ name: m.name, income: m.income, expense: m.expense }));
 
   return (
     <Card title="הכנסות מול הוצאות - 6 חודשים אחרונים">

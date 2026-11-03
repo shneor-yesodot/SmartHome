@@ -4,6 +4,11 @@ export const FREQUENCY_LABELS = { daily: 'יומי', weekly: 'שבועי', month
 
 export const SOURCE_LABELS = { manual: 'ידני', receipt: 'קבלה', import: 'יבוא Excel', recurring: 'הוראת קבע' };
 
+export const CALENDAR_OPTIONS = [
+  { value: 'gregorian', label: 'לועזי' },
+  { value: 'hebrew', label: 'עברי' },
+];
+
 export const COLORS = ['#12A05C', '#2F7FD1', '#E08A1E', '#D9508A', '#D93F3F', '#7B61D9', '#1FA6A6', '#5C6BC0', '#7C8B83'];
 
 export const CHART_COLORS = { income: '#12A05C', expense: '#E5605F', grid: '#E3EAE5', axis: '#7C8B83' };

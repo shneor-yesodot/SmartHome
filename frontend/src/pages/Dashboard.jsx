@@ -17,7 +17,6 @@ import TransactionForm from '../components/transactions/TransactionForm';
 import { useAuth } from '../context/AuthContext';
 import { useFetch } from '../hooks/useFetch';
 import { dashboardService } from '../services/dashboard.service';
-import { HEBREW_MONTHS } from '../utils/format';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -31,7 +30,7 @@ export default function Dashboard() {
     <>
       <PageHeader
         title={`שלום ${user?.name?.split(' ')[0] || ''} 👋`}
-        subtitle={`סקירת מצב משק הבית שלך לחודש ${HEBREW_MONTHS[data.period.month]}`}
+        subtitle={`סקירת מצב משק הבית שלך לחודש ${data.period.name}`}
       >
         <Button icon={Plus} onClick={() => setFormOpen(true)}>
           עסקה חדשה
