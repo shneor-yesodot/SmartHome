@@ -64,6 +64,7 @@ const FIXED = [
 const VARIABLE = [
   { times: [2, 4], category: 'תחבורה ורכב', description: 'תדלוק', merchants: ['פז', 'סונול', 'דלק'], amount: [210, 340] },
   { times: [3, 6], category: 'מסעדות ובילויים', description: 'ארוחה בחוץ', merchants: ['קפה נואר', 'ג׳פניקה', 'פיצה שמש', 'בית קפה ארומה'], amount: [58, 290] },
+  { times: [3, 5], category: 'צדקה ומעשרות', description: 'תרומה', merchants: ['קופת העיר', 'ישיבת אור התורה', 'גמ״ח שכונתי', 'בית הכנסת', 'עזר מציון'], amount: [350, 850] },
   { times: [1, 2], category: 'בריאות וטיפוח', description: 'בית מרקחת', merchants: ['סופר-פארם', 'Be'], amount: [45, 190] },
   { times: [0, 2], category: 'ביגוד והנעלה', description: 'בגדים', merchants: ['קסטרו', 'FOX', 'זארה'], amount: [120, 460] },
   { times: [0, 1], category: 'מסעדות ובילויים', description: 'כרטיסים לקולנוע', merchants: ['סינמה סיטי'], amount: [84, 168] },
@@ -80,7 +81,9 @@ const seed = async () => {
     await User.deleteOne({ _id: existing._id });
   }
 
-  const user = await User.create(DEMO);
+  // Maaser is tracked from the first month of the demo data
+  const firstMonth = shiftMonth(currentMonth().year, currentMonth().month, -(MONTHS_BACK - 1));
+  const user = await User.create({ ...DEMO, maaser: { startDate: new Date(Date.UTC(firstMonth.year, firstMonth.month, 1)) } });
   const categories = await Category.insertMany(defaultCategories.map((c) => ({ ...c, user: user._id, isDefault: true })));
   const categoryId = (name, type) => categories.find((c) => c.name === name && c.type === type)._id;
 

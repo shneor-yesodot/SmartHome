@@ -10,6 +10,8 @@ const categorySchema = new Schema(
     icon: { type: String, default: 'Tag' }, // lucide-react icon name
     color: { type: String, default: '#12A05C', match: /^#[0-9A-Fa-f]{6}$/ },
     isDefault: { type: Boolean, default: false },
+    // Expenses in this category are donations / maaser and count toward the maaser target
+    isMaaser: { type: Boolean, default: false },
   },
   baseOptions
 );

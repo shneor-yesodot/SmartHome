@@ -35,23 +35,26 @@ const withSavings = (totals) => ({
 
 /**
  * The month summary in the shape of a household summary sheet: income,
- * day-to-day expenses by category, standing orders and the final balance.
+ * day-to-day expenses by category, standing orders, maaser and the balance.
  */
 const summarize = (transactions, totals) => {
   const expenses = transactions.filter((t) => t.type === 'expense');
-  const standing = expenses.filter((t) => t.source === 'recurring');
-  const daily = expenses.filter((t) => t.source !== 'recurring');
+  const isDonation = (t) => Boolean(t.category?.isMaaser);
+  const standing = expenses.filter((t) => t.source === 'recurring' && !isDonation(t));
+  const donations = expenses.filter(isDonation);
+  const daily = expenses.filter((t) => t.source !== 'recurring' && !isDonation(t));
   const sum = (items) => round2(items.reduce((s, t) => s + t.amount, 0));
+  const byDate = (a, b) => new Date(a.date) - new Date(b.date);
   return {
     income: breakdownByCategory(transactions, 'income'),
     dailyExpenses: breakdownByCategory(daily, 'expense'),
-    standingOrders: standing
-      .map((t) => ({ id: String(t._id), description: t.description, amount: t.amount, date: t.date }))
-      .sort((a, b) => new Date(a.date) - new Date(b.date)),
+    standingOrders: standing.map((t) => ({ id: String(t._id), description: t.description, amount: t.amount, date: t.date })).sort(byDate),
+    donations: donations.map((t) => ({ id: String(t._id), recipient: t.merchant || t.description, amount: t.amount, date: t.date })).sort(byDate),
     totals: {
       income: totals.income,
       dailyExpenses: sum(daily),
       standingOrders: sum(standing),
+      donations: sum(donations),
       expense: totals.expense,
       balance: totals.balance,
     },

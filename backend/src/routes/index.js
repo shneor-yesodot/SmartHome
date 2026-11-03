@@ -17,5 +17,6 @@ router.use('/recurring', require('./recurring.routes'));
 router.use('/products', require('./product.routes'));
 router.use('/receipts', require('./receipt.routes'));
 router.use('/reports', require('./report.routes'));
+router.use('/maaser', require('./maaser.routes'));
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { USER_ROLES, CALENDARS } = require('../config/constants');
+const { USER_ROLES, CALENDARS, MAASER_MODES } = require('../config/constants');
 const { baseOptions } = require('./plugins');
 
 const SALT_ROUNDS = 12;
@@ -17,6 +17,14 @@ const userSchema = new Schema(
     currency: { type: String, default: 'ILS' },
     // Which months the dashboard, budgets and reports are counted by
     calendar: { type: String, enum: CALENDARS, default: 'gregorian' },
+    // Maaser target: a percent of each month's income, or a fixed monthly amount.
+    // Unpaid (or overpaid) amounts carry over from `startDate` on.
+    maaser: {
+      mode: { type: String, enum: MAASER_MODES, default: 'percent' },
+      percent: { type: Number, default: 10, min: 1, max: 100 },
+      amount: { type: Number, default: 2000, min: 0 },
+      startDate: Date,
+    },
     emailVerified: { type: Boolean, default: false },
     googleId: { type: String, index: { unique: true, sparse: true }, select: false },
     notifications: {

@@ -1,5 +1,5 @@
 import {
-  Baby, Book, Briefcase, Bus, Car, Coffee, Coins, Dumbbell, Film, Fuel, Gem, Gift, GraduationCap, HeartPulse, Home,
+  Baby, Book, Briefcase, Bus, Car, Coffee, Coins, Dumbbell, Film, Fuel, Gem, Gift, GraduationCap, HandHeart, HeartPulse, Home,
   Landmark, Laptop, MoreHorizontal, PawPrint, Plane, ShieldCheck, Shirt, ShoppingCart, Smartphone,
   Sofa, Tag, Utensils, Wifi, Wrench, Zap,
 } from 'lucide-react';
@@ -8,7 +8,7 @@ import {
 export const ICONS = {
   ShoppingCart, Home, Car, Utensils, HeartPulse, GraduationCap, Shirt, Smartphone, Briefcase, Landmark,
   Coins, Plane, ShieldCheck, Laptop, Gift, PawPrint, Dumbbell, Baby, Fuel, Zap, Wifi, Film, Book, Coffee,
-  Bus, Wrench, Sofa, Gem, Tag, MoreHorizontal,
+  Bus, Wrench, Sofa, Gem, HandHeart, Tag, MoreHorizontal,
 };
 
 export const ICON_NAMES = Object.keys(ICONS);

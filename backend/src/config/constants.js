@@ -16,6 +16,10 @@ const RECEIPT_MIME_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp
 
 const FALLBACK_CATEGORY_NAME = 'אחר';
 
+// Maaser (tithe): a share of the income, or a fixed amount every month
+const MAASER_MODES = Object.freeze(['percent', 'fixed']);
+const MAASER_CATEGORY_NAME = 'צדקה ומעשרות';
+
 module.exports = {
   TRANSACTION_TYPES,
   TRANSACTION_SOURCES,
@@ -26,4 +30,6 @@ module.exports = {
   TARGET_SAVINGS_RATE,
   RECEIPT_MIME_TYPES,
   FALLBACK_CATEGORY_NAME,
+  MAASER_MODES,
+  MAASER_CATEGORY_NAME,
 };

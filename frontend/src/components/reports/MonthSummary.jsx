@@ -31,14 +31,14 @@ function Section({ title, total, tone, rows, empty }) {
   );
 }
 
-/** The month on one page, like the household summary sheet: income, expenses, standing orders, balance. */
+/** The month on one page, like the household summary sheet: income, expenses, standing orders, maaser, balance. */
 export default function MonthSummary({ summary, period }) {
   const { totals } = summary;
   const byCategory = (list) => list.map((c) => ({ key: c.categoryId, name: c.name, color: c.color, total: c.total }));
 
   return (
     <Card title={`סיכום ${period.label}`} icon={ClipboardList}>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <Section title="הכנסות" total={totals.income} tone="text-brand-600" rows={byCategory(summary.income)} empty="לא נרשמו הכנסות." />
         <Section title="הוצאות שוטפות" total={totals.dailyExpenses} tone="text-danger-500" rows={byCategory(summary.dailyExpenses)} empty="לא נרשמו הוצאות." />
         <Section
@@ -47,6 +47,13 @@ export default function MonthSummary({ summary, period }) {
           tone="text-danger-500"
           rows={summary.standingOrders.map((o) => ({ key: o.id, name: o.description, note: formatDay(o.date, period.calendar), total: o.amount }))}
           empty="לא ירדו הוראות קבע בחודש הזה."
+        />
+        <Section
+          title="מעשרות וצדקה"
+          total={totals.donations}
+          tone="text-[#B7791F]"
+          rows={summary.donations.map((d) => ({ key: d.id, name: d.recipient, note: formatDay(d.date, period.calendar), total: d.amount }))}
+          empty="לא נרשמו תרומות בחודש הזה."
         />
       </div>
 

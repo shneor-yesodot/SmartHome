@@ -2,7 +2,7 @@ const categoryRepository = require('../repositories/category.repository');
 const transactionRepository = require('../repositories/transaction.repository');
 const budgetRepository = require('../repositories/budget.repository');
 const ApiError = require('../utils/ApiError');
-const { FALLBACK_CATEGORY_NAME } = require('../config/constants');
+const { FALLBACK_CATEGORY_NAME, MAASER_CATEGORY_NAME } = require('../config/constants');
 const defaultCategories = require('../seed/defaultCategories');
 
 const list = (userId, { type } = {}) =>
@@ -44,4 +44,20 @@ const getFallback = async (userId, type) => {
 const seedDefaults = (userId) =>
   categoryRepository.createMany(userId, defaultCategories.map((c) => ({ ...c, isDefault: true })));
 
-module.exports = { list, create, update, remove, assertOwned, getFallback, seedDefaults };
+/**
+ * The category whose expenses count as maaser / tzedakah. Accounts created
+ * before it existed get it on first use (an existing category with the same
+ * name is reused).
+ */
+const getMaaserCategory = async (userId) => {
+  const flagged = await categoryRepository.findOneWhere(userId, { isMaaser: true });
+  if (flagged) return flagged;
+  const named = await categoryRepository.findByName(userId, MAASER_CATEGORY_NAME, 'expense');
+  if (named) {
+    named.isMaaser = true;
+    return named.save();
+  }
+  return categoryRepository.create(userId, { name: MAASER_CATEGORY_NAME, type: 'expense', icon: 'HandHeart', color: '#B7791F', isMaaser: true });
+};
+
+module.exports = { list, create, update, remove, assertOwned, getFallback, getMaaserCategory, seedDefaults };

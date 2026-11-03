@@ -65,6 +65,16 @@
 
 בתשובה מופיע `period`: `{ calendar, name, label, start, end, days, key }`, למשל `label: "חשוון תשפ״ז"`, ו‑`end` הוא היום האחרון בחודש.
 
+## מעשרות וצדקה – `/api/maaser`
+
+תרומה היא הוצאה בקטגוריה המסומנת `isMaaser` ("צדקה ומעשרות", נוצרת אוטומטית). הנמען נשמר בשדה `merchant`, ולכן תרומות נספרות גם במאזן ובדוחות. היעד החודשי הוא אחוז מהכנסות החודש או סכום קבוע. מה שלא ניתן (או ניתן מעבר ליעד) עובר לחודש הבא, החל מ‑`startDate`.
+
+| שיטה | נתיב | תיאור |
+|------|------|-------|
+| GET | `/maaser?calendar=&date=` | חודש לועזי או עברי: `target, given, carryOver, remaining, income`, רשימת `donations`, סיכום `byRecipient`, `history` של 12 חודשים ו‑`settings` |
+| PUT | `/maaser/settings` | `mode` (`percent` / `fixed`), `percent?`, `amount?`, `startDate?` |
+| POST | `/maaser/donations` | `recipient, amount, date, notes?`: נשמר כעסקת הוצאה בקטגוריית המעשרות |
+
 ## דשבורד – `/api/dashboard`
 
 | שיטה | נתיב | תיאור |
