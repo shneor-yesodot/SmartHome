@@ -69,6 +69,127 @@ afterAll(async () => {
   await mongo.stop();
 });
 
+describe('purchases made of items', () => {
+  const cardHeader = ['תאריך עסקה', 'שם בית העסק', '4 ספרות אחרונות של כרטיס האשראי', 'סכום חיוב', 'תאריך חיוב'];
+  const uploadForm = async (path, rows) => {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), 'a');
+    const form = new FormData();
+    form.append('file', new Blob([XLSX.write(book, { type: 'buffer', bookType: 'xlsx' })]), 'file.xlsx');
+    const res = await fetch(base + path, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+    return { status: res.status, body: await res.json() };
+  };
+  const itemsNamed = async (merchant) => (await call(`/transactions?search=${encodeURIComponent(merchant)}&limit=100`)).body.data;
+  const netOf = async (merchant) => (await itemsNamed(merchant)).reduce((s, t) => s + t.amount, 0);
+
+  it('a typed basket and its card line count once, and the items learn the card', async () => {
+    const food = categoryId('סופר ומזון');
+    const basket = await call('/transactions/basket', {
+      method: 'POST',
+      body: { merchant: 'מכולת הפריטים', date: '2026-03-10', items: [{ name: 'קורנפלקס', total: 21.9, category: food }, { name: 'חלב', total: 10.1, category: food }] },
+    });
+    expect(basket.status).toBe(201);
+
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, ['11/03/2026', 'מכולת הפריטים', '3333', 32, '10/04/2026']]);
+    const [row] = preview.body.data.rows;
+    expect(row).toMatchObject({ flag: 'items', include: true, itemCount: 2 });
+    expect(preview.body.data.summary.linkedPurchases).toBe(1);
+
+    const commit = await call('/imports/statement/commit', { method: 'POST', body: { rows: [{ ...pick(row), purchase: row.purchase }] } });
+    expect(commit.body.data).toMatchObject({ created: 0, linked: 1, skipped: 0 });
+
+    const items = await itemsNamed('מכולת הפריטים');
+    expect(items).toHaveLength(2);
+    expect(await netOf('מכולת הפריטים')).toBeCloseTo(32);
+    items.forEach((t) => {
+      expect(t.account.last4).toBe('3333');
+      expect(t.chargeDate.slice(0, 10)).toBe('2026-04-10');
+    });
+
+    const again = await uploadForm('/imports/statement/preview', [cardHeader, ['11/03/2026', 'מכולת הפריטים', '3333', 32, '10/04/2026']]);
+    expect(again.body.data.rows[0].flag).toBe('imported');
+  });
+
+  it('splits a statement line, keeps its card and total, and importing again adds nothing', async () => {
+    const line = ['12/03/2026', 'סופר הפיצול', '3333', 100, '10/04/2026'];
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, line]);
+    await call('/imports/statement/commit', { method: 'POST', body: { rows: preview.body.data.rows.map(pick) } });
+    const [imported] = await itemsNamed('סופר הפיצול');
+
+    const clothes = categoryId('ביגוד והנעלה');
+    const wrong = await call(`/transactions/${imported.id}/split`, { method: 'POST', body: { items: [{ name: 'א', total: 60 }, { name: 'ב', total: 30 }] } });
+    expect(wrong.status).toBe(400);
+
+    const split = await call(`/transactions/${imported.id}/split`, { method: 'POST', body: { items: [{ name: 'חולצה', total: 60, category: clothes }, { name: 'לחם', total: 40 }] } });
+    expect(split.status).toBe(200);
+
+    const items = await itemsNamed('סופר הפיצול');
+    expect(items).toHaveLength(2);
+    expect(await netOf('סופר הפיצול')).toBe(100);
+    expect(items.find((t) => t.description === 'חולצה').category.id).toBe(clothes);
+    expect(items.find((t) => t.description === 'לחם').category.id).toBe(imported.category.id);
+    items.forEach((t) => expect(t.account.last4).toBe('3333'));
+
+    expect((await uploadForm('/imports/statement/preview', [cardHeader, line])).body.data.rows[0].flag).toBe('imported');
+    expect((await call(`/transactions/${imported.id}/split`, { method: 'POST', body: { items: [{ name: 'א', total: 30 }, { name: 'ב', total: 30 }] } })).status).toBe(409);
+
+    // Deleting the item that holds the fingerprint must not bring the whole line back
+    expect((await call(`/transactions/${imported.id}`, { method: 'DELETE' })).status).toBe(204);
+    expect((await uploadForm('/imports/statement/preview', [cardHeader, line])).body.data.rows[0].flag).toBe('imported');
+  });
+});
+
+describe('categories from a household summary sheet', () => {
+  const sheet = [
+    ['הוצאות', '', '', '', '', '', 'הכנסות'],
+    ['חודש', 'שכירות', 'אוכל ', 'מעשר', 'סה"כ', '', 'חודש', 'הכנסה קבועה', 'קצבת ילדים', 'סה"כ', '', 'חודש', 'סכום'],
+    ['תשרי', 3000, 800, 1400, 5200, '', 'תשרי', 12000, 115, 12115, '', 'תשרי', 6915],
+  ];
+  const importSheet = async () => {
+    const reg = await call('/auth/register', { method: 'POST', bearer: null, body: { name: 'קטגוריות', email: 'cats@example.com', password: 'Secret123' } });
+    const own = reg.body.data.token;
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(sheet), 'a');
+    const form = new FormData();
+    form.append('file', new Blob([XLSX.write(book, { type: 'buffer', bookType: 'xlsx' })]), 'summary.xlsx');
+    const res = await fetch(`${base}/categories/import/preview`, { method: 'POST', headers: { Authorization: `Bearer ${own}` }, body: form });
+    return { own, preview: (await res.json()).data };
+  };
+
+  it('replaces unused defaults, keeps what is used, and maaser keeps its role', async () => {
+    const { own, preview } = await importSheet();
+    expect(preview).toMatchObject({ expense: ['שכירות', 'אוכל', 'מעשר'], income: ['הכנסה קבועה', 'קצבת ילדים'] });
+    expect(preview.removed).toContain('סופר ומזון');
+    expect(preview.removed).not.toContain('צדקה ומעשרות');
+    expect(preview.removed).not.toContain('אחר');
+
+    // A default that is in use must survive
+    const before = (await call('/categories', { bearer: own })).body.data;
+    const salary = before.find((c) => c.name === 'משכורת');
+    await call('/transactions', { method: 'POST', bearer: own, body: { type: 'income', amount: 10, category: salary.id, description: 'משכורת', date: '2026-03-01' } });
+
+    const res = await call('/categories/import/commit', { method: 'POST', bearer: own, body: { expense: preview.expense, income: preview.income } });
+    expect(res.status).toBe(200);
+
+    const after = (await call('/categories', { bearer: own })).body.data;
+    const names = after.map((c) => c.name);
+    expect(names).toEqual(expect.arrayContaining(['שכירות', 'אוכל', 'מעשר', 'הכנסה קבועה', 'קצבת ילדים', 'משכורת', 'אחר']));
+    expect(names).not.toContain('סופר ומזון');
+    expect(names).not.toContain('סכום');
+    expect(after.filter((c) => c.isMaaser).map((c) => c.name)).toEqual(['מעשר']);
+    expect(after.filter((c) => c.name === 'מעשר')).toHaveLength(1);
+
+    // Maaser still works, in the renamed category
+    const donated = await call('/maaser/donations', { method: 'POST', bearer: own, body: { recipient: 'בדיקה', amount: 50, date: '2026-03-02' } });
+    expect(donated.status).toBe(201);
+    expect(donated.body.data.category.name ?? after.find((c) => c.id === donated.body.data.category)?.name).toBe('מעשר');
+
+    // Running it again changes nothing
+    const again = await call('/categories/import/commit', { method: 'POST', bearer: own, body: { expense: preview.expense, income: preview.income } });
+    expect(again.body.data.created).toBe(0);
+  });
+});
+
 describe('credit cards', () => {
   let card;
 
@@ -160,7 +281,7 @@ describe('statement import', () => {
     const { body } = await upload(statement);
     const res = await call('/imports/statement/commit', { method: 'POST', body: { rows: body.data.rows.map(pick) } });
     expect(res.status).toBe(201);
-    expect(res.body.data).toEqual({ created: 4, skipped: 0 });
+    expect(res.body.data).toEqual({ created: 4, linked: 0, skipped: 0 });
 
     const accounts = (await call('/accounts')).body.data;
     const card = accounts.find((a) => a.last4 === '2222');
@@ -175,7 +296,7 @@ describe('statement import', () => {
     expect(body.data.summary).toMatchObject({ included: 0, imported: 4 });
     // Even if the client sends the lines anyway
     const res = await call('/imports/statement/commit', { method: 'POST', body: { rows: body.data.rows.map(pick) } });
-    expect(res.body.data).toEqual({ created: 0, skipped: 4 });
+    expect(res.body.data).toEqual({ created: 0, linked: 0, skipped: 4 });
   });
 
   it('a duplicate that slips past the check is still stopped by the database', async () => {

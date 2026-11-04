@@ -145,8 +145,9 @@ export default function Transactions() {
       <ImportStatementModal
         open={statementOpen}
         onClose={() => setStatementOpen(false)}
-        onImported={({ created, skipped }) => {
-          toast.success(skipped ? `יובאו ${created} תנועות, ${skipped} כבר היו במערכת` : `יובאו ${created} תנועות`);
+        onImported={({ created, linked, skipped }) => {
+          const parts = [`יובאו ${created} תנועות`, linked && `${linked} קושרו לפריטים`, skipped && `${skipped} כבר היו במערכת`];
+          toast.success(parts.filter(Boolean).join(', '));
           reload();
         }}
       />

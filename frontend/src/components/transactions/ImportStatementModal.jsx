@@ -18,11 +18,13 @@ const FLAGS = {
   duplicate: 'נראה שכבר נרשמה',
 };
 
-const flagText = (row) =>
-  row.flag === 'duplicate' && row.duplicateOf ? `${FLAGS.duplicate}: ${row.duplicateOf.description}, ${formatDate(row.duplicateOf.date)}` : FLAGS[row.flag];
+const flagText = (row) => {
+  if (row.flag === 'items') return `מתאים ל-${row.itemCount} הפריטים שרשמתם: הם יקושרו לחיוב ולא ייספרו פעמיים`;
+  return row.flag === 'duplicate' && row.duplicateOf ? `${FLAGS.duplicate}: ${row.duplicateOf.description}, ${formatDate(row.duplicateOf.date)}` : FLAGS[row.flag];
+};
 
-const toPayload = ({ type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash }) => ({
-  type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash,
+const toPayload = ({ type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase }) => ({
+  type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase,
 });
 
 /** Choose a statement -> review each line (the risky ones start switched off) -> save. */
@@ -111,7 +113,8 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
             <Badge tone="success">{selected.length} ייובאו</Badge>
             {preview.summary.imported > 0 && <Badge>{preview.summary.imported} כבר יובאו בעבר</Badge>}
             {preview.summary.settlements > 0 && <Badge tone="warning">{preview.summary.settlements} חיובי כרטיס בעו״ש</Badge>}
-            {preview.summary.cashWithdrawals > 0 && <Badge tone="warning">{preview.summary.cashWithdrawals} משיכות מזומן</Badge>}
+            {preview.summary.linkedPurchases > 0 && <Badge tone="success">{preview.summary.linkedPurchases} יקושרו לפריטים שנרשמו</Badge>}
+            {preview.summary.cashWithdrawals > 0 &&<Badge tone="warning">{preview.summary.cashWithdrawals} משיכות מזומן</Badge>}
             {preview.summary.duplicates > 0 &&<Badge tone="warning">{preview.summary.duplicates} ייתכן שכבר נרשמו</Badge>}
           </div>
 
@@ -170,7 +173,7 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
                   <Select
                     className="col-start-2 col-end-4 !py-1.5 sm:col-auto"
                     value={r.category || ''}
-                    disabled={locked}
+                    disabled={locked || Boolean(r.purchase)}
                     onChange={(e) => patch(r.row, { category: e.target.value || null })}
                     aria-label={`קטגוריה של ${r.description}`}
                   >

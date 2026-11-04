@@ -16,6 +16,8 @@ router.post('/basket', validate(schema.basket), controller.createBasket);
 
 router.route('/').get(validate(schema.listQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
 
+router.post('/:id/split', validate(idParam, 'params'), validate(schema.split), controller.split);
+
 router
   .route('/:id')
   .all(validate(idParam, 'params'))

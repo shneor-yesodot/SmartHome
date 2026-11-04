@@ -44,4 +44,6 @@ const bulkCreate = asyncHandler(async (req, res) => {
 
 const createBasket = asyncHandler(async (req, res) => created(res, await transactionManager.createBasket(req.user.id, req.body)));
 
-module.exports = { list, getById, create, update, remove, exportExcel, importTemplate, importPreview, bulkCreate, createBasket };
+const split = asyncHandler(async (req, res) => ok(res, await transactionManager.split(req.user.id, req.params.id, req.body)));
+
+module.exports = { list, getById, create, update, remove, split, exportExcel, importTemplate, importPreview, bulkCreate, createBasket };

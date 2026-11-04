@@ -33,6 +33,7 @@ function Meta({ t }) {
       )}
       {t.source !== 'manual' && <Badge className="!px-2 !py-0.5">{SOURCE_LABELS[t.source]}</Badge>}
       {t.isRefund && <Badge className="!px-2 !py-0.5">זיכוי</Badge>}
+      {t.purchase && <Badge className="!px-2 !py-0.5">פריט מקנייה</Badge>}
     </>
   );
 }

@@ -237,4 +237,34 @@ const parseStatement = (buffer) => {
   return addFingerprints(lines);
 };
 
-module.exports = { parseStatement, parseAmount, parseDate, isCardSettlement };
+/**
+ * Category names from a household summary sheet: a header row whose columns go
+ * "חודש, <expenses...>, סה"כ", and then the same for income. Throws when there is none.
+ */
+const parseSummaryCategories = (buffer) => {
+  const workbook = readWorkbook(buffer);
+  const names = (cells) => {
+    const groups = [];
+    let current = null;
+    cells.forEach((cell) => {
+      const header = normalizeHeader(cell);
+      if (header === 'חודש') current = [];
+      else if (header === 'סהכ' && current) {
+        groups.push(current);
+        current = null;
+      } else if (current && header) current.push(cleanText(stripMarks(cell)).slice(0, 40));
+    });
+    return groups;
+  };
+
+  for (const name of workbook.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, raw: true, defval: '', blankrows: false });
+    for (const cells of rows.slice(0, 50)) {
+      const [expense, income = []] = names(cells);
+      if (expense?.length) return { expense: [...new Set(expense)], income: [...new Set(income)] };
+    }
+  }
+  throw new Error('no summary header found');
+};
+
+module.exports = { parseStatement, parseSummaryCategories, parseAmount, parseDate, isCardSettlement };

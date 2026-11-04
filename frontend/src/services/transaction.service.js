@@ -17,4 +17,6 @@ export const transactionService = {
   bulkCreate: (rows) => unwrap(api.post('/transactions/bulk', { rows })),
   /** One purchase with several products: { merchant, date, notes?, items: [{ name, quantity, total, category }] } */
   createBasket: (data) => unwrap(api.post('/transactions/basket', data)),
+  /** Breaks a transaction into items whose total equals it: [{ name, quantity, total, category }] */
+  split: (id, items) => unwrap(api.post(`/transactions/${id}/split`, { items })),
 };

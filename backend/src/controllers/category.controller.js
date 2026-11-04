@@ -12,4 +12,7 @@ const remove = asyncHandler(async (req, res) => {
   noContent(res);
 });
 
-module.exports = { list, create, update, remove };
+const importPreview = asyncHandler(async (req, res) => ok(res, await categoryManager.previewImport(req.user.id, req.file)));
+const importCommit = asyncHandler(async (req, res) => ok(res, await categoryManager.importNames(req.user.id, req.body)));
+
+module.exports = { list, create, update, remove, importPreview, importCommit };

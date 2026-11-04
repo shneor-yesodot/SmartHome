@@ -17,4 +17,7 @@ const update = Joi.object({
 
 const listQuery = Joi.object({ type: type() });
 
-module.exports = { create, update, listQuery };
+const names = () => Joi.array().items(Joi.string().trim().min(1).max(40)).max(100).default([]);
+const importCommit = Joi.object({ expense: names(), income: names() });
+
+module.exports = { create, update, listQuery, importCommit };

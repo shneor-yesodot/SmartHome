@@ -18,6 +18,7 @@ const commit = Joi.object({
         isRefund: Joi.boolean(),
         standing: Joi.boolean(),
         importHash: Joi.string().hex().length(64).required(),
+        purchase: objectId().allow(null),
       })
     )
     .min(1)

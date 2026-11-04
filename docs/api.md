@@ -103,7 +103,8 @@
 | GET | `/transactions/import/template` | הורדת קובץ תבנית ליבוא |
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
 | POST | `/transactions/bulk` | יצירה גורפת: `rows[]` (עד 1000) |
-| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת |
+| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, account?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת, והם חולקים `purchase`. שורה בדף שסכומה שווה לסל, עד 3 ימים מתאריכו, מקושרת אליו ולא נספרת שוב |
+| POST | `/transactions/:id/split` | מפצל הוצאה לפריטים: `items[]` (לפחות 2). הסכום חייב להיות שווה לעסקה (אחרת 400), והכרטיס ומועד החיוב נשמרים |
 
 ## כרטיסים וחשבונות – `/api/accounts`
 
@@ -144,6 +145,8 @@
 | POST | `/categories` | `name, type, icon?, color?` |
 | PUT | `/categories/:id` | `name?, icon?, color?` |
 | DELETE | `/categories/:id` | נחסם (409) אם יש עסקאות בקטגוריה |
+| POST | `/categories/import/preview` | קובץ `file`: קורא מגיליון סיכום את העמודות שבין "חודש" ל"סה״כ". מחזיר `expense, income, removed` בלי לשמור |
+| POST | `/categories/import/commit` | `expense[], income[]`: מוסיף את החדשות, מסיר ברירות מחדל שלא בשימוש, ועמודת המעשר משנה את שם קטגוריית המעשר |
 
 ## תקציבים – `/api/budgets`
 

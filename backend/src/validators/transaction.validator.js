@@ -62,24 +62,25 @@ const bulkCreate = Joi.object({
     .label('שורות'),
 });
 
+const purchaseItem = Joi.object({
+  name: shortText(120).min(1).required().label('שם המוצר'),
+  quantity: fields.quantity.default(1),
+  total: money().required().label('סכום'),
+  category: objectId().allow(null).label('קטגוריה'),
+});
+
 // One purchase split into products (e.g. a grocery run) - every item becomes a transaction
 const basket = Joi.object({
   merchant: fields.merchant.default(''),
   date: fields.date.required(),
   notes: fields.notes,
-  items: Joi.array()
-    .items(
-      Joi.object({
-        name: shortText(120).min(1).required().label('שם המוצר'),
-        quantity: fields.quantity.default(1),
-        total: money().required().label('סכום'),
-        category: objectId().allow(null).label('קטגוריה'),
-      })
-    )
-    .min(1)
-    .max(200)
-    .required()
-    .label('מוצרים'),
+  account: fields.account,
+  items: Joi.array().items(purchaseItem).min(1).max(200).required().label('מוצרים'),
 });
 
-module.exports = { create, update, listQuery, bulkCreate, basket };
+// An existing transaction, usually a statement line, broken into the items it was made of
+const split = Joi.object({
+  items: Joi.array().items(purchaseItem).min(2).max(200).required().label('מוצרים'),
+});
+
+module.exports = { create, update, listQuery, bulkCreate, basket, split };

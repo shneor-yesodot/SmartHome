@@ -64,6 +64,26 @@ class TransactionRepository extends BaseRepository {
     return new Set(rows.map((r) => r.importHash));
   }
 
+  /** Items of purchases dated in [from, to), with their import fingerprints. */
+  findPurchaseItems(userId, from, to) {
+    return this.model
+      .find({ user: userId, type: 'expense', purchase: { $type: 'objectId' }, date: { $gte: from, $lt: to } })
+      .select('+importHash')
+      .lean();
+  }
+
+  /** All the items of one purchase, oldest first, with their import fingerprints. */
+  findPurchase(userId, purchase) {
+    return this.model.find({ user: userId, purchase }).sort({ createdAt: 1, _id: 1 }).select('+importHash');
+  }
+
+  /** The statement line that paid for a purchase: its card reaches every item, its fingerprint one. */
+  async linkPurchase(userId, purchase, firstItemId, { account, chargeDate, importHash }) {
+    const payment = account ? { account, ...(chargeDate ? { chargeDate } : {}) } : {};
+    if (Object.keys(payment).length) await this.model.updateMany({ user: userId, purchase }, { $set: payment });
+    await this.model.updateOne({ _id: firstItemId, user: userId }, { $set: { importHash } });
+  }
+
   /** Total charged per charge date of one card, newest first. */
   chargesOfAccount(userId, accountId, limit = 12) {
     return this.model

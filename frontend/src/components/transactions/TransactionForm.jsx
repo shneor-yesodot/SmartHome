@@ -5,6 +5,7 @@ import Button from '../ui/Button';
 import TypeToggle from '../ui/TypeToggle';
 import { Field, Input, Select } from '../ui/Field';
 import BasketItems, { basketTotal, newItem } from './BasketItems';
+import SplitForm from './SplitForm';
 import { useCategories } from '../../context/CategoriesContext';
 import { useToast } from '../../context/ToastContext';
 import { useAction } from '../../hooks/useAction';
@@ -41,6 +42,23 @@ export default function TransactionForm({ open, transaction, onClose, onSaved })
 }
 
 function FormBody({ transaction, onClose, onSaved }) {
+  const [splitting, setSplitting] = useState(false);
+  if (splitting) {
+    return (
+      <SplitForm
+        transaction={transaction}
+        onBack={() => setSplitting(false)}
+        onDone={() => {
+          onSaved();
+          onClose();
+        }}
+      />
+    );
+  }
+  return <EditBody transaction={transaction} onClose={onClose} onSaved={onSaved} onSplit={() => setSplitting(true)} />;
+}
+
+function EditBody({ transaction, onClose, onSaved, onSplit }) {
   const { byType } = useCategories();
   const { data: accounts } = useFetch(accountService.list, []);
   const toast = useToast();
@@ -59,7 +77,7 @@ function FormBody({ transaction, onClose, onSaved }) {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const categories = byType(form.type);
-  const defaultCategory = form.category || (categories.find((c) => c.name === 'סופר ומזון') || categories[0])?.id || '';
+  const defaultCategory = form.category || (categories.find((c) => c.name === 'אוכל' || c.name === 'סופר ומזון') || categories[0])?.id || '';
   const canAddProducts = !transaction && form.type === 'expense';
   const basket = items.length > 0;
 
@@ -128,7 +146,7 @@ function FormBody({ transaction, onClose, onSaved }) {
       items: items.map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity) || 1, total: Number(i.total), category: i.category || null })),
     };
     const { ok } = await run(
-      () => (receipt ? receiptService.confirm(receipt.id, payload) : transactionService.createBasket({ ...payload, notes: form.notes })),
+      () => (receipt ? receiptService.confirm(receipt.id, payload) : transactionService.createBasket({ ...payload, notes: form.notes, account: form.account || null })),
       `נשמרו ${items.length} מוצרים כעסקאות`
     );
     if (ok) {
@@ -171,6 +189,18 @@ function FormBody({ transaction, onClose, onSaved }) {
   const dateField = (
     <Field label="תאריך">
       <Input type="date" required value={form.date} onChange={set('date')} />
+    </Field>
+  );
+  const accountField = (
+    <Field label="אמצעי תשלום">
+      <Select value={form.account} onChange={set('account')}>
+        <option value="">לא צוין</option>
+        {accounts?.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </Select>
     </Field>
   );
 
@@ -221,6 +251,7 @@ function FormBody({ transaction, onClose, onSaved }) {
             {merchantField}
             {dateField}
           </div>
+          {!receipt && accountField}
           <BasketItems items={items} onChange={changeItems} categories={categories} />
         </>
       ) : (
@@ -252,16 +283,7 @@ function FormBody({ transaction, onClose, onSaved }) {
             {merchantField}
           </div>
 
-          <Field label="אמצעי תשלום">
-            <Select value={form.account} onChange={set('account')}>
-              <option value="">לא צוין</option>
-              {accounts?.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {accountField}
 
           {form.type === 'expense' && (
             <div className="rounded-xl border border-line p-3.5">
@@ -304,6 +326,11 @@ function FormBody({ transaction, onClose, onSaved }) {
       )}
 
       <div className="flex justify-end gap-2 pt-1">
+        {transaction?.type === 'expense' && !transaction.purchase && (
+          <Button variant="secondary" className="me-auto" onClick={onSplit}>
+            פיצול לפריטים
+          </Button>
+        )}
         <Button variant="secondary" onClick={onClose}>
           ביטול
         </Button>

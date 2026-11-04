@@ -128,8 +128,58 @@ const update = async (userId, id, data) => {
 };
 
 const remove = async (userId, id) => {
-  const transaction = await transactionRepository.deleteByUser(userId, id);
+  const transaction = await transactionRepository.findOneByUser(userId, id);
   if (!transaction) throw ApiError.notFound('העסקה לא נמצאה');
+  const items = transaction.purchase ? await transactionRepository.findPurchase(userId, transaction.purchase) : [];
+  const holder = items.find((t) => t.importHash && t.id === String(id));
+  const heir = items.find((t) => t.id !== String(id));
+
+  await transactionRepository.deleteByUser(userId, id);
+  // The other items are still that statement line: importing the file again must not add it back
+  if (holder && heir) {
+    heir.importHash = holder.importHash;
+    await heir.save();
+  }
+};
+
+/**
+ * Turns one transaction, usually a statement line, into the items it was made of.
+ * Their total must equal the original, so the books and the card stay the same.
+ */
+const split = async (userId, id, { items }) => {
+  const original = await transactionRepository.findOneByUser(userId, id);
+  if (!original) throw ApiError.notFound('העסקה לא נמצאה');
+  if (original.type !== 'expense') throw ApiError.badRequest('אפשר לפצל רק הוצאה');
+  if (original.purchase) throw ApiError.conflict('העסקה הזו כבר חלק מקנייה מפוצלת');
+
+  const total = round2(items.reduce((s, i) => s + i.total, 0));
+  if (total !== round2(original.amount)) {
+    throw ApiError.badRequest(`סכום הפריטים (${total}) חייב להיות שווה לסכום העסקה (${round2(original.amount)})`);
+  }
+
+  const before = { amount: original.amount, description: original.description };
+  const [first, ...rest] = itemsToRows({
+    merchant: original.merchant || original.description.slice(0, 80),
+    date: original.date,
+    notes: original.notes,
+    items: items.map((i) => ({ ...i, category: i.category || original.category })),
+  });
+  // The original stays as the first item, so its statement fingerprint stays too
+  const { category: firstCategory } = first;
+  await categoryManager.assertOwned(userId, firstCategory, 'expense');
+  original.set(normalize(first));
+  await original.save();
+  try {
+    const created = await bulkCreate(userId, rest, {
+      source: original.source,
+      extra: { account: original.account, chargeDate: original.chargeDate, receipt: original.receipt, recurring: original.recurring },
+    });
+    return { created: created.length + 1, total };
+  } catch (err) {
+    original.set({ ...before, purchase: undefined, productName: undefined, productKey: undefined, unitPrice: undefined, quantity: 1 });
+    await original.save();
+    throw err;
+  }
 };
 
 /**
@@ -195,8 +245,10 @@ const previewImport = async (userId, file) => {
 };
 
 /** Product lines of one purchase (manual basket or receipt) as expense rows. */
-const itemsToRows = ({ merchant, date, notes, items }) =>
-  items.map((item) => ({
+const itemsToRows = ({ merchant, date, notes, items }) => {
+  const purchase = items.length > 1 ? new mongoose.Types.ObjectId() : undefined;
+  return items.map((item) => ({
+    ...(purchase ? { purchase } : {}),
     type: 'expense',
     amount: item.total,
     category: item.category,
@@ -208,10 +260,12 @@ const itemsToRows = ({ merchant, date, notes, items }) =>
     date,
     ...(notes ? { notes } : {}),
   }));
+};
 
 /** A purchase with several products, entered by hand - one transaction per product. */
 const createBasket = async (userId, basket) => {
-  const transactions = await bulkCreate(userId, itemsToRows(basket), { source: 'manual' });
+  const charge = await accountManager.resolveCharge(userId, basket.account, basket.date);
+  const transactions = await bulkCreate(userId, itemsToRows(basket), { source: 'manual', extra: charge });
   return { created: transactions.length, total: round2(basket.items.reduce((s, i) => s + i.total, 0)) };
 };
 
@@ -221,6 +275,7 @@ module.exports = {
   create,
   update,
   remove,
+  split,
   bulkCreate,
   itemsToRows,
   createBasket,

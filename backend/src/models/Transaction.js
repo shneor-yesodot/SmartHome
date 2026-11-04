@@ -19,6 +19,9 @@ const transactionSchema = new Schema(
     quantity: { type: Number, min: 0.001, default: 1 },
     unitPrice: { type: Number, min: 0 },
 
+    // Items bought together share this id: a statement shows them as one line with their total
+    purchase: { type: Schema.Types.ObjectId },
+
     // Where the transaction came from
     source: { type: String, enum: TRANSACTION_SOURCES, default: 'manual' },
     receipt: { type: Schema.Types.ObjectId, ref: 'Receipt' },
@@ -39,6 +42,7 @@ transactionSchema.index({ user: 1, date: -1 });
 transactionSchema.index({ user: 1, category: 1, date: -1 });
 transactionSchema.index({ user: 1, productKey: 1 });
 transactionSchema.index({ user: 1, account: 1, date: -1 });
+transactionSchema.index({ user: 1, purchase: 1 }, { partialFilterExpression: { purchase: { $type: 'objectId' } } });
 transactionSchema.index(
   { user: 1, importHash: 1 },
   { unique: true, partialFilterExpression: { importHash: { $type: 'string' } } }

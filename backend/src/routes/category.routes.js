@@ -3,8 +3,12 @@ const controller = require('../controllers/category.controller');
 const schema = require('../validators/category.validator');
 const { idParam } = require('../validators/common.validator');
 const validate = require('../middleware/validate');
+const { statementUpload, requireFile } = require('../middleware/upload');
 
 const router = Router();
+
+router.post('/import/preview', statementUpload, requireFile('statement'), controller.importPreview);
+router.post('/import/commit', validate(schema.importCommit), controller.importCommit);
 
 router.route('/').get(validate(schema.listQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
 
