@@ -13,6 +13,12 @@ SmartHome is a household finance app: a React + Vite frontend (`frontend/`) and 
 - `backend/src/config/db.js`: with no `MONGO_URI` in development, starts an embedded MongoDB on port 27018 (data in `backend/.data`).
 - `frontend/src/services/api.js`: Axios instance; attaches the access token and refreshes it once on 401.
 - `frontend/src/context/AuthContext.jsx`: current user, login/register/verify/logout.
+- Sessions: the access token stays in memory; the refresh token is only ever in the httpOnly cookie `sh_refresh`, never in a response body. `ALLOWED_EMAILS` decides who may open an account (empty = closed in production).
+- `backend/src/services/statement.service.js` + `managers/import.manager.js`: bank and card statement import. Every line has an `importHash`; lines that would count money twice start switched off.
+- `backend/src/utils/sheetSync.js` (the comparison logic) + `managers/sheets.manager.js`: Google Sheets sync. Removing a row in the sheet never deletes from the app.
+- `Account` (card / checking / cash) is what `Transaction.account` and `RecurringPayment.account` point to. `Transaction.isRefund` is income in the books but excluded from maaser.
+- Root `Dockerfile` + `render.yaml`: one container where the API also serves the built frontend (`FRONTEND_DIR`).
+- `frontend/public/sw.js`: caches only the app's own files. It must never cache `/api`.
 
 ## Working Notes
 

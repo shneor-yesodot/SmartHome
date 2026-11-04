@@ -2,6 +2,7 @@ const recurringRepository = require('../repositories/recurring.repository');
 const transactionRepository = require('../repositories/transaction.repository');
 const categoryManager = require('./category.manager');
 const budgetManager = require('./budget.manager');
+const accountManager = require('./account.manager');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { addFrequency, startOfDay } = require('../utils/dateUtils');
@@ -9,19 +10,22 @@ const { addFrequency, startOfDay } = require('../utils/dateUtils');
 // Safety cap when catching up after the server was down for a long time
 const MAX_CATCH_UP_RUNS = 36;
 
+const POPULATE = 'category account';
+
 const list = (userId) =>
-  recurringRepository.findAllByUser(userId, {}, { sort: { isActive: -1, nextRun: 1 }, populate: 'category' });
+  recurringRepository.findAllByUser(userId, {}, { sort: { isActive: -1, nextRun: 1 }, populate: POPULATE });
 
 const getById = async (userId, id) => {
-  const payment = await recurringRepository.findOneByUser(userId, id, { populate: 'category' });
+  const payment = await recurringRepository.findOneByUser(userId, id, { populate: POPULATE });
   if (!payment) throw ApiError.notFound('הוראת הקבע לא נמצאה');
   return payment;
 };
 
-const create = async (userId, { startDate, ...data }) => {
+const create = async (userId, { startDate, account, ...data }) => {
   await categoryManager.assertOwned(userId, data.category, data.type);
-  const payment = await recurringRepository.create(userId, { ...data, nextRun: startOfDay(startDate) });
-  return payment.populate('category');
+  if (account) await accountManager.getById(userId, account);
+  const payment = await recurringRepository.create(userId, { ...data, ...(account ? { account } : {}), nextRun: startOfDay(startDate) });
+  return payment.populate(POPULATE);
 };
 
 const update = async (userId, id, { startDate, ...data }) => {
@@ -29,6 +33,8 @@ const update = async (userId, id, { startDate, ...data }) => {
   if (data.category || data.type) {
     await categoryManager.assertOwned(userId, data.category || current.category._id, data.type || current.type);
   }
+  if (data.account) await accountManager.getById(userId, data.account);
+  else if ('account' in data) data.account = null;
   if (startDate) data.nextRun = startOfDay(startDate);
   await recurringRepository.updateByUser(userId, id, data);
   return getById(userId, id);
@@ -40,8 +46,12 @@ const remove = async (userId, id) => {
 };
 
 /** Records one occurrence of the payment as a regular transaction. */
-const createOccurrence = (payment, date) =>
-  transactionRepository.create(payment.user, {
+const createOccurrence = async (payment, date) => {
+  const paidWith = payment.account?._id || payment.account;
+  // The card may have been removed since; the payment itself still happened
+  const charge = await accountManager.resolveCharge(payment.user, paidWith, date).catch(() => ({}));
+  return transactionRepository.create(payment.user, {
+    ...charge,
     type: payment.type,
     amount: payment.amount,
     category: payment.category._id || payment.category,
@@ -51,6 +61,7 @@ const createOccurrence = (payment, date) =>
     source: 'recurring',
     recurring: payment._id,
   });
+};
 
 /** "Run now" button: records today's occurrence and moves the schedule one period ahead. */
 const runNow = async (userId, id) => {

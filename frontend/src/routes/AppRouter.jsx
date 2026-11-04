@@ -14,6 +14,7 @@ import OAuthCallback from '../pages/OAuthCallback';
 
 // Secondary screens are loaded on demand to keep the first load small
 const Transactions = lazy(() => import('../pages/Transactions'));
+const Cards = lazy(() => import('../pages/Cards'));
 const Products = lazy(() => import('../pages/Products'));
 const Reports = lazy(() => import('../pages/Reports'));
 const Budgets = lazy(() => import('../pages/Budgets'));
@@ -43,6 +44,7 @@ export default function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/cards" element={<Cards />} />
             <Route path="/products" element={<Products />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/budgets" element={<Budgets />} />

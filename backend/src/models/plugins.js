@@ -9,6 +9,9 @@ const toJSON = {
     delete ret.sessions;
     delete ret.otp;
     delete ret.passwordReset;
+    delete ret.twoFactor;
+    delete ret.failedLogins;
+    delete ret.lockedUntil;
     delete ret.googleId;
     delete ret.fileData;
     return ret;

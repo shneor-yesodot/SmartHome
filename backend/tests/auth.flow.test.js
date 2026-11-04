@@ -26,14 +26,22 @@ let server;
 let base;
 
 const call = async (path, { method = 'GET', body, token } = {}) => {
+  // The refresh token travels only in a cookie; here it is handled like the browser would
+  const { refreshToken, ...rest } = body || {};
   const res = await fetch(base + path, {
     method,
     redirect: 'manual',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(refreshToken ? { Cookie: `sh_refresh=${refreshToken}` } : {}),
+    },
+    body: body ? JSON.stringify(rest) : undefined,
   });
   const json = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
-  return { status: res.status, body: json, location: res.headers.get('location') };
+  const cookie = (res.headers.get('set-cookie') || '').match(/sh_refresh=([^;]*)/)?.[1];
+  if (cookie && json?.data) json.data.refreshToken = decodeURIComponent(cookie);
+  return { status: res.status, body: json, location: res.headers.get('location'), setCookie: res.headers.get('set-cookie') };
 };
 
 // jest.config clears mock calls between tests, so the captured values are kept here
@@ -125,6 +133,35 @@ describe('sessions', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+
+  it('keeps the refresh token out of reach of page scripts', async () => {
+    const res = await fetch(`${base}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+    });
+    const data = (await res.json()).data;
+    expect(data.refreshToken).toBeUndefined();
+    expect(data.refreshExpiresAt).toBeUndefined();
+    const cookie = res.headers.get('set-cookie');
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Strict/i);
+    expect(cookie).toMatch(/Path=\/api\/auth/i);
+  });
+
+  it('tells the browser not to store API answers', async () => {
+    const res = await fetch(`${base}/auth/me`, { headers: { Authorization: `Bearer ${session.token}` } });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('refuses a refresh token sent in the body', async () => {
+    const raw = await fetch(`${base}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: session.refreshToken }),
+    });
+    expect(raw.status).toBe(401);
   });
 
   it('logout revokes the refresh token', async () => {

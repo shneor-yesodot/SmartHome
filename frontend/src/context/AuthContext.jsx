@@ -6,14 +6,14 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(Boolean(tokenStore.get() || tokenStore.getRefresh()));
-  // What the server offers on the login screen (Google button, e-mail verification)
-  const [authConfig, setAuthConfig] = useState({ google: false, emailVerification: false });
+  const [loading, setLoading] = useState(tokenStore.hasSession());
+  // What the server offers on the login screen (Google button, e-mail verification, sign-up)
+  const [authConfig, setAuthConfig] = useState({ google: false, emailVerification: false, registration: false });
 
-  // Restore the session when the app loads (an expired access token is refreshed by the API layer)
+  // Restore the session when the app loads: the API layer gets a new access token from the cookie
   useEffect(() => {
     authService.config().then(setAuthConfig).catch(() => {});
-    if (!tokenStore.get() && !tokenStore.getRefresh()) return;
+    if (!tokenStore.hasSession()) return;
     authService
       .me()
       .then((data) => setUser(data.user))
@@ -28,9 +28,8 @@ export function AuthProvider({ children }) {
 
   /** Revokes the refresh token on the server too, so it cannot be reused. */
   const logout = useCallback(async () => {
-    const refreshToken = tokenStore.getRefresh();
     clearSession();
-    if (refreshToken) await authService.logout(refreshToken).catch(() => {});
+    await authService.logout().catch(() => {});
   }, [clearSession]);
 
   // The API layer fires this event when the session cannot be renewed
@@ -44,12 +43,12 @@ export function AuthProvider({ children }) {
     setUser(session.user);
   }, []);
 
-  /** Login and register either start a session or ask for the e-mail verification code. */
+  /** A login can start a session, ask for the e-mail code, or ask for the authenticator code. */
   const handleAuthResult = useCallback(
     (result) => {
-      if (result.verificationRequired) return result;
+      if (result.verificationRequired || result.twoFactorRequired) return result;
       startSession(result);
-      return { verificationRequired: false };
+      return {};
     },
     [startSession]
   );
@@ -61,9 +60,10 @@ export function AuthProvider({ children }) {
       authConfig,
       isAuthenticated: Boolean(user),
       login: async (credentials) => handleAuthResult(await authService.login(credentials)),
+      loginTwoFactor: async (data) => startSession(await authService.loginTwoFactor(data)),
       register: async (details) => handleAuthResult(await authService.register(details)),
       verifyEmail: async (data) => startSession(await authService.verifyEmail(data)),
-      resetPassword: async (data) => startSession(await authService.resetPassword(data)),
+      resetPassword: async (data) => handleAuthResult(await authService.resetPassword(data)),
       startSession,
       logout,
       setUser,

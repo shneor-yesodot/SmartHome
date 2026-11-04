@@ -1,7 +1,9 @@
+const mongoose = require('mongoose');
 const transactionRepository = require('../repositories/transaction.repository');
 const categoryRepository = require('../repositories/category.repository');
 const categoryManager = require('./category.manager');
 const budgetManager = require('./budget.manager');
+const accountManager = require('./account.manager');
 const excelService = require('../services/excel.service');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
@@ -10,12 +12,22 @@ const { round2 } = require('../utils/finance');
 const { escapeRegex, toProductKey } = require('../utils/text');
 
 const MAX_EXPORT_ROWS = 5000;
+const POPULATE = 'category account';
+
+const castForAggregate = (filter) => {
+  const out = { ...filter };
+  if (out.category) out.category = new mongoose.Types.ObjectId(String(out.category));
+  if (out.account) out.account = new mongoose.Types.ObjectId(String(out.account));
+  return out;
+};
 
 /** Translates query-string filters into a MongoDB filter. */
-const buildFilter = ({ type, category, source, from, to, search }) => {
+const buildFilter = ({ type, category, account, chargeDate, source, from, to, search }) => {
   const filter = {};
   if (type) filter.type = type;
   if (category) filter.category = category;
+  if (account) filter.account = account;
+  if (chargeDate) filter.chargeDate = chargeDate;
   if (source) filter.source = source;
   if (from || to) {
     filter.date = {};
@@ -60,10 +72,11 @@ const list = async (userId, query) => {
       sort: { date: -1, createdAt: -1 },
       skip: (page - 1) * limit,
       limit,
-      populate: 'category',
+      populate: POPULATE,
     }),
     transactionRepository.countByUser(userId, filter),
-    transactionRepository.sumByType(userId, filter),
+    // Aggregations do not cast strings the way find() does
+    transactionRepository.sumByType(userId, castForAggregate(filter)),
   ]);
 
   return {
@@ -78,16 +91,17 @@ const list = async (userId, query) => {
 };
 
 const getById = async (userId, id) => {
-  const transaction = await transactionRepository.findOneByUser(userId, id, { populate: 'category' });
+  const transaction = await transactionRepository.findOneByUser(userId, id, { populate: POPULATE });
   if (!transaction) throw ApiError.notFound('העסקה לא נמצאה');
   return transaction;
 };
 
-const create = async (userId, data) => {
+const create = async (userId, { account, chargeDate, ...data }) => {
   await categoryManager.assertOwned(userId, data.category, data.type);
-  const transaction = await transactionRepository.create(userId, normalize(data));
+  const charge = await accountManager.resolveCharge(userId, account, data.date, chargeDate);
+  const transaction = await transactionRepository.create(userId, { ...normalize(data), ...charge });
   if (transaction.type === 'expense') triggerBudgetAlerts(userId, [transaction.category]);
-  return transaction.populate('category');
+  return transaction.populate(POPULATE);
 };
 
 const update = async (userId, id, data) => {
@@ -96,7 +110,18 @@ const update = async (userId, id, data) => {
   if (data.category || data.type) {
     await categoryManager.assertOwned(userId, data.category || current.category._id, type);
   }
-  current.set(normalize({ amount: current.amount, quantity: current.quantity, ...data }));
+  const doc = normalize({ amount: current.amount, quantity: current.quantity, ...data });
+  // The charge date follows the card and the purchase date, unless it was given explicitly
+  const accountChanged = 'account' in data && String(data.account || '') !== String(current.account?._id || '');
+  const dateChanged = data.date && new Date(data.date).getTime() !== current.date.getTime();
+  if (accountChanged || dateChanged || data.chargeDate) {
+    const account = 'account' in data ? data.account : current.account?._id;
+    Object.assign(doc, await accountManager.resolveCharge(userId, account, data.date || current.date, data.chargeDate));
+  } else {
+    delete doc.account;
+    delete doc.chargeDate;
+  }
+  current.set(doc);
   await current.save();
   if (type === 'expense') triggerBudgetAlerts(userId, [current.category._id || current.category]);
   return getById(userId, id);
@@ -135,7 +160,7 @@ const exportToExcel = async (userId, query) => {
   const transactions = await transactionRepository.findAllByUser(userId, buildFilter(query), {
     sort: { date: -1 },
     limit: MAX_EXPORT_ROWS,
-    populate: 'category',
+    populate: POPULATE,
   });
   return excelService.buildTransactionsWorkbook(transactions);
 };

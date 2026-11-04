@@ -45,7 +45,17 @@ const summarize = (transactions, totals) => {
   const daily = expenses.filter((t) => t.source !== 'recurring' && !isDonation(t));
   const sum = (items) => round2(items.reduce((s, t) => s + t.amount, 0));
   const byDate = (a, b) => new Date(a.date) - new Date(b.date);
+
+  // How much left through each checking account and card
+  const accounts = new Map();
+  for (const t of expenses) {
+    const key = String(t.account?._id || 'none');
+    const row = accounts.get(key) || { accountId: key, name: t.account?.name || 'ללא אמצעי תשלום', color: t.account?.color || '#7C8B83', total: 0 };
+    row.total = round2(row.total + t.amount);
+    accounts.set(key, row);
+  }
   return {
+    byAccount: [...accounts.values()].sort((a, b) => b.total - a.total),
     income: breakdownByCategory(transactions, 'income'),
     dailyExpenses: breakdownByCategory(daily, 'expense'),
     standingOrders: standing.map((t) => ({ id: String(t._id), description: t.description, amount: t.amount, date: t.date })).sort(byDate),
@@ -66,7 +76,7 @@ const monthly = async (userId, period) => {
   const prevPeriod = shiftPeriod(period, -1);
 
   const [transactions, previousTransactions] = await Promise.all([
-    transactionRepository.findInRange(userId, period.from, period.to, { populate: 'category' }),
+    transactionRepository.findInRange(userId, period.from, period.to, { populate: 'category account' }),
     transactionRepository.findInRange(userId, prevPeriod.from, prevPeriod.to, { populate: 'category' }),
   ]);
 
@@ -132,4 +142,4 @@ const periods = ({ calendar = 'gregorian', count = 12 } = {}, now = new Date()) 
   return Array.from({ length: count }, (_, i) => describePeriod(shiftPeriod(current, -i)));
 };
 
-module.exports = { monthly, periods, breakdownByCategory };
+module.exports = { monthly, periods, breakdownByCategory, summarize };

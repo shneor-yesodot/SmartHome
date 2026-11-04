@@ -23,6 +23,14 @@ const transactionSchema = new Schema(
     source: { type: String, enum: TRANSACTION_SOURCES, default: 'manual' },
     receipt: { type: Schema.Types.ObjectId, ref: 'Receipt' },
     recurring: { type: Schema.Types.ObjectId, ref: 'RecurringPayment' },
+
+    // How it was paid. On a credit card, `chargeDate` is the day it reaches the bank account.
+    account: { type: Schema.Types.ObjectId, ref: 'Account' },
+    chargeDate: Date,
+    // Money back on a purchase: counts as income in the books, but not for maaser
+    isRefund: { type: Boolean, default: false },
+    // Fingerprint of an imported statement line, so importing the same file twice adds nothing
+    importHash: { type: String, select: false },
   },
   baseOptions
 );
@@ -30,5 +38,10 @@ const transactionSchema = new Schema(
 transactionSchema.index({ user: 1, date: -1 });
 transactionSchema.index({ user: 1, category: 1, date: -1 });
 transactionSchema.index({ user: 1, productKey: 1 });
+transactionSchema.index({ user: 1, account: 1, date: -1 });
+transactionSchema.index(
+  { user: 1, importHash: 1 },
+  { unique: true, partialFilterExpression: { importHash: { $type: 'string' } } }
+);
 
 module.exports = model('Transaction', transactionSchema);

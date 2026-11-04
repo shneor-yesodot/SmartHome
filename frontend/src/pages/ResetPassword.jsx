@@ -23,8 +23,9 @@ export default function ResetPassword() {
     setError('');
     setPending(true);
     try {
-      await resetPassword({ token, password: form.password });
-      navigate('/', { replace: true });
+      const result = await resetPassword({ token, password: form.password });
+      if (result.twoFactorRequired) navigate('/login', { replace: true, state: { challenge: result.challenge } });
+      else navigate('/', { replace: true });
     } catch (err) {
       setError(err.message);
       setPending(false);

@@ -20,6 +20,11 @@ const FALLBACK_CATEGORY_NAME = 'אחר';
 const MAASER_MODES = Object.freeze(['percent', 'fixed']);
 const MAASER_CATEGORY_NAME = 'צדקה ומעשרות';
 
+// Where money moves through: a bank (checking) account, a credit card or cash
+const ACCOUNT_KINDS = Object.freeze(['bank', 'credit', 'cash']);
+// Google Sheets: the sheet only mirrors the app, or edits in it come back to the app
+const SHEET_SYNC_MODES = Object.freeze(['backup', 'two-way']);
+
 module.exports = {
   TRANSACTION_TYPES,
   TRANSACTION_SOURCES,
@@ -32,4 +37,6 @@ module.exports = {
   FALLBACK_CATEGORY_NAME,
   MAASER_MODES,
   MAASER_CATEGORY_NAME,
+  ACCOUNT_KINDS,
+  SHEET_SYNC_MODES,
 };

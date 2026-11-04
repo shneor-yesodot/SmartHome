@@ -28,26 +28,34 @@
 
 ## אימות – `/api/auth`
 
-**סשן** = `{ user, token, refreshToken }`. ה‑`token` (access, ברירת מחדל 15 דקות) נשלח בכל בקשה. ה‑`refreshToken` (ברירת מחדל 7 ימים) משמש רק לקבלת זוג חדש:
+**סשן** = `{ user, token }` ועוגיית `sh_refresh`. ה‑`token` (access, ברירת מחדל 15 דקות) נשלח בכל בקשה. העוגייה (ברירת מחדל 7 ימים, `HttpOnly`, `SameSite=Strict`, ו‑`Secure` בפרודקשן) משמשת רק לקבלת טוקן חדש, וסקריפטים בדף לא יכולים לקרוא אותה:
 
 - כל רענון מחליף את ה‑refresh token (rotation).
 - שימוש חוזר ב‑token שכבר הוחלף נחשב גניבה ומבטל את כל הסשנים של המשתמש. יוצא מן הכלל: חלון של 30 שניות, בשביל שתי לשוניות שמרעננות יחד.
 
 **אימות מייל** פעיל רק כשמוגדר SMTP. במקרה כזה הרשמה והתחברות של חשבון לא מאומת מחזירות `{ verificationRequired: true, email }` במקום סשן.
 
+**הרשמה** מותרת רק לכתובות שב‑`ALLOWED_EMAILS`. אם המשתנה ריק, היא סגורה בפרודקשן (403) ופתוחה בפיתוח. אותו כלל חל על חשבון חדש דרך Google.
+
+**אימות דו‑שלבי:** בחשבון שהפעיל אותו, כל מסלול כניסה (סיסמה, Google, איפוס סיסמה) מחזיר `{ twoFactorRequired: true, challenge }` במקום סשן. קוד שכבר נוצל נדחה. חמישה כישלונות נועלים את החשבון ל‑15 דקות.
+
 | שיטה | נתיב | תיאור | גוף הבקשה |
 |---|---|---|---|
-| GET | `/auth/config` | מה זמין בשרת: `{ google, emailVerification }` | – |
+| GET | `/auth/config` | מה זמין בשרת: `{ google, emailVerification, registration }` | – |
 | POST | `/auth/register` | הרשמה ויצירת קטגוריות ברירת מחדל. מחזיר סשן או `verificationRequired` | `name, email, password` |
-| POST | `/auth/login` | התחברות. מחזיר סשן או `verificationRequired` | `email, password` |
+| POST | `/auth/login` | התחברות. מחזיר סשן, `verificationRequired` או `twoFactorRequired` | `email, password` |
+| POST | `/auth/login/2fa` | סיום ההתחברות עם קוד מהאפליקציה או קוד גיבוי. מחזיר סשן | `challenge, code` |
 | POST | `/auth/verify-email` | אימות הקוד (6 ספרות, 10 דקות, עד 5 ניסיונות). מחזיר סשן | `email, code` |
 | POST | `/auth/resend-code` | שליחת קוד חדש. התשובה זהה בכל מקרה | `email` |
 | POST | `/auth/forgot-password` | שליחת קישור איפוס (תקף שעה). התשובה זהה בכל מקרה | `email` |
-| POST | `/auth/reset-password` | סיסמה חדשה: מבטל את כל הסשנים ומחזיר סשן חדש | `token, password` |
-| POST | `/auth/refresh` | זוג טוקנים חדש | `refreshToken` |
-| POST | `/auth/logout` | ביטול ה‑refresh token | `refreshToken` |
+| POST | `/auth/reset-password` | סיסמה חדשה: מבטל את כל הסשנים ומחזיר סשן חדש או `twoFactorRequired` | `token, password` |
+| POST | `/auth/refresh` | טוקן חדש ועוגייה חדשה | – (העוגייה) |
+| POST | `/auth/logout` | ביטול ה‑refresh token ומחיקת העוגייה | – (העוגייה) |
 | GET | `/auth/google` | הפניה להתחברות עם Google (`?returnTo=/path`) | – |
-| GET | `/auth/google/callback` | חזרה מ‑Google. הטוקנים חוזרים ב‑fragment אל `/oauth-callback` | – |
+| GET | `/auth/google/callback` | חזרה מ‑Google. קובע את העוגייה ומפנה אל `/oauth-callback`, או אל `/login` עם `challenge` ב‑fragment | – |
+| POST | `/auth/2fa/setup` 🔒 | סוד חדש וקוד QR. לא פעיל עד האישור | `password` |
+| POST | `/auth/2fa/enable` 🔒 | הפעלה עם קוד מהאפליקציה. מחזיר 8 קודי גיבוי, פעם אחת בלבד | `code` |
+| POST | `/auth/2fa/disable` 🔒 | כיבוי | `password, code` |
 | GET | `/auth/me` 🔒 | המשתמש המחובר | – |
 | PATCH | `/auth/me` 🔒 | עדכון שם, העדפות התראה ולוח שנה | `name?, notifications?, calendar?` (`gregorian` / `hebrew`) |
 | PUT | `/auth/password` 🔒 | החלפת סיסמה: מבטל את שאר הסשנים ומחזיר סשן חדש | `currentPassword, newPassword` |
@@ -86,8 +94,8 @@
 
 | שיטה | נתיב | תיאור |
 |---|---|---|
-| GET | `/transactions` | רשימה עם סינון ודפדוף. פרמטרים: `page, limit, type, category, source, from, to, search` |
-| POST | `/transactions` | יצירה: `type, amount, category, description, date, merchant?, notes?, productName?, quantity?` |
+| GET | `/transactions` | רשימה עם סינון ודפדוף. פרמטרים: `page, limit, type, category, account, chargeDate, source, from, to, search` |
+| POST | `/transactions` | יצירה: `type, amount, category, description, date, merchant?, notes?, productName?, quantity?, account?, chargeDate?`. בכרטיס עם יום חיוב, `chargeDate` מחושב אם לא נשלח |
 | GET | `/transactions/:id` | עסקה בודדת |
 | PUT | `/transactions/:id` | עדכון |
 | DELETE | `/transactions/:id` | מחיקה |
@@ -96,6 +104,37 @@
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
 | POST | `/transactions/bulk` | יצירה גורפת: `rows[]` (עד 1000) |
 | POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת |
+
+## כרטיסים וחשבונות – `/api/accounts`
+
+| שיטה | נתיב | תיאור |
+|---|---|---|
+| GET | `/accounts` | כל אמצעי התשלום |
+| GET | `/accounts/overview` | סיכום חודש לכל אמצעי תשלום: הוצאה נטו, קטגוריות והחיוב הבא. פרמטרים: `calendar, date` |
+| POST | `/accounts` | יצירה: `name, kind? (credit / bank / cash), last4?, issuer?, billingDay?, color?`. נשמרות רק 4 ספרות אחרונות |
+| PUT | `/accounts/:id` | עדכון |
+| DELETE | `/accounts/:id` | מחיקה. העסקאות והוראות הקבע נשארות, בלי שיוך |
+| GET | `/accounts/:id/charges` | 12 החיובים האחרונים: `date, total, count` |
+
+## יבוא דפי בנק ואשראי – `/api/imports`
+
+| שיטה | נתיב | תיאור |
+|---|---|---|
+| POST | `/imports/statement/preview` | העלאת `.xlsx`, `.xls`, `.csv` או `.html` (שדה `file`). לא שומר דבר. מחזיר `kind, rows[], newCards[], summary` |
+| POST | `/imports/statement/commit` | שמירה: `rows[]` (עד 2000) ו‑`account?`. מחזיר `{ created, skipped }` |
+
+בכל שורה: `include` קובע אם היא מסומנת כברירת מחדל, ו‑`flag` מסביר למה לא: `imported` (כבר יובאה), `settlement` (חיוב כרטיס בעו"ש) או `duplicate` (נראה שכבר נרשמה ידנית או כהוראת קבע). זיכוי בכרטיס נשמר עם `isRefund`: נספר כהכנסה בדוחות, אך לא בחישוב המעשר.
+
+## Google Sheets – `/api/sheets`
+
+| שיטה | נתיב | תיאור |
+|---|---|---|
+| GET | `/sheets` | מצב החיבור וכתובת חשבון השירות |
+| POST | `/sheets/connect` | חיבור: `spreadsheet` (קישור או מזהה), `mode? (backup / two-way)`, `autoSync?` |
+| PATCH | `/sheets` | שינוי `mode` או `autoSync` |
+| DELETE | `/sheets` | ניתוק. הגיליון עצמו נשאר |
+| GET | `/sheets/preview` | מה סנכרון דו‑כיווני היה עושה, בלי לשנות דבר |
+| POST | `/sheets/sync` | סנכרון עכשיו. מחזיר `pushed, created, updated, conflicts, restored, invalid` |
 
 ## קטגוריות – `/api/categories`
 

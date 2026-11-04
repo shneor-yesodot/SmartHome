@@ -2,7 +2,9 @@ export const TYPE_LABELS = { income: 'הכנסה', expense: 'הוצאה' };
 
 export const FREQUENCY_LABELS = { daily: 'יומי', weekly: 'שבועי', monthly: 'חודשי', yearly: 'שנתי' };
 
-export const SOURCE_LABELS = { manual: 'ידני', receipt: 'קבלה', import: 'יבוא Excel', recurring: 'הוראת קבע' };
+export const SOURCE_LABELS = { manual: 'ידני', receipt: 'קבלה', import: 'יבוא', recurring: 'הוראת קבע' };
+
+export const ACCOUNT_KIND_LABELS = { credit: 'כרטיס אשראי', bank: 'חשבון עו״ש', cash: 'מזומן' };
 
 export const CALENDAR_OPTIONS = [
   { value: 'gregorian', label: 'לועזי' },

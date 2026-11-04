@@ -8,6 +8,8 @@ import BasketItems, { basketTotal, newItem } from './BasketItems';
 import { useCategories } from '../../context/CategoriesContext';
 import { useToast } from '../../context/ToastContext';
 import { useAction } from '../../hooks/useAction';
+import { useFetch } from '../../hooks/useFetch';
+import { accountService } from '../../services/account.service';
 import { transactionService } from '../../services/transaction.service';
 import { receiptService } from '../../services/receipt.service';
 import { formatMoney, toInputDate, todayInput } from '../../utils/format';
@@ -19,6 +21,7 @@ const toForm = (t) => ({
   type: t?.type || 'expense',
   amount: t?.amount ?? '',
   category: t?.category?.id || '',
+  account: t?.account?.id || '',
   description: t?.description || '',
   merchant: t?.merchant || '',
   date: t ? toInputDate(t.date) : todayInput(),
@@ -39,6 +42,7 @@ export default function TransactionForm({ open, transaction, onClose, onSaved })
 
 function FormBody({ transaction, onClose, onSaved }) {
   const { byType } = useCategories();
+  const { data: accounts } = useFetch(accountService.list, []);
   const toast = useToast();
   const { run, pending } = useAction();
   const [form, setForm] = useState(() => toForm(transaction));
@@ -145,6 +149,7 @@ function FormBody({ transaction, onClose, onSaved }) {
       merchant: form.merchant,
       date: form.date,
       notes: form.notes,
+      account: form.account || null,
       productName: showProduct ? form.productName : '',
       ...(showProduct && form.productName ? { quantity: Number(form.quantity) || 1 } : {}),
     };
@@ -246,6 +251,17 @@ function FormBody({ transaction, onClose, onSaved }) {
             </Field>
             {merchantField}
           </div>
+
+          <Field label="אמצעי תשלום">
+            <Select value={form.account} onChange={set('account')}>
+              <option value="">לא צוין</option>
+              {accounts?.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           {form.type === 'expense' && (
             <div className="rounded-xl border border-line p-3.5">

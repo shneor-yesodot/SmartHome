@@ -47,7 +47,8 @@ const overview = async (user, period) => {
   let carryOver = 0;
   const months = periods.map((p) => {
     const inMonth = transactions.filter((t) => t.date >= p.from && t.date < p.to);
-    const income = sum(inMonth.filter((t) => t.type === 'income'));
+    // Money back on a purchase is not earnings, so no maaser is owed on it
+    const income = sum(inMonth.filter((t) => t.type === 'income' && !t.isRefund));
     return {
       period: p,
       income,

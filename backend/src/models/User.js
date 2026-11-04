@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { USER_ROLES, CALENDARS, MAASER_MODES } = require('../config/constants');
+const { USER_ROLES, CALENDARS, MAASER_MODES, SHEET_SYNC_MODES } = require('../config/constants');
 const { baseOptions } = require('./plugins');
 
 const SALT_ROUNDS = 12;
@@ -32,6 +32,15 @@ const userSchema = new Schema(
       monthlySummary: { type: Boolean, default: true },
     },
     lastLoginAt: Date,
+    twoFactorEnabled: { type: Boolean, default: false },
+    // Backup to a Google spreadsheet (see managers/sheets.manager.js)
+    sheets: {
+      spreadsheetId: String,
+      mode: { type: String, enum: SHEET_SYNC_MODES, default: 'backup' },
+      autoSync: { type: Boolean, default: true },
+      lastSyncAt: Date,
+      lastError: String,
+    },
 
     // ---- Secrets: never selected by default, never serialized ----
     // Refresh token ids (jti), one active per logged-in device. Rotated ids stay
@@ -41,6 +50,11 @@ const userSchema = new Schema(
     otp: { type: { hash: String, expiresAt: Date, attempts: Number }, select: false },
     // Password reset token (stored hashed)
     passwordReset: { type: { hash: String, expiresAt: Date }, select: false },
+    // Authenticator app: encrypted secret, hashed one-time backup codes, last accepted time step
+    twoFactor: { type: { secret: String, backupCodes: [String], lastStep: Number }, select: false },
+    // Failed password attempts, for locking the account for a while
+    failedLogins: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, select: false },
   },
   baseOptions
 );

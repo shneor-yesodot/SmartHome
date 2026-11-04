@@ -11,6 +11,12 @@ const { round2 } = require('../utils/finance');
 const { currentMonth, shiftMonth, daysInMonth, startOfDay, addDays } = require('../utils/dateUtils');
 const logger = require('../utils/logger');
 
+// A publicly documented password must never exist on a real deployment
+if (require('../config/env').isProd) {
+  logger.error('The demo seed does not run in production');
+  process.exit(1);
+}
+
 const DEMO = { name: 'משפחת ישראלי', email: 'demo@smarthome.co.il', password: 'Demo1234', emailVerified: true };
 const MONTHS_BACK = 6;
 

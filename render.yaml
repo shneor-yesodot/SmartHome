@@ -1,0 +1,33 @@
+# Render blueprint: one web service built from the root Dockerfile.
+# Secrets marked sync: false are typed in Render's dashboard and never committed.
+services:
+  - type: web
+    name: smarthome
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free           # Sleeps after 15 idle minutes and takes about a minute to wake. "starter" stays awake and can send e-mail
+    region: frankfurt
+    branch: main
+    autoDeploy: true     # Render builds it on its own servers; no GitHub Actions minutes are used
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: CLIENT_URL
+        sync: false      # e.g. https://smarthome.onrender.com
+      - key: ALLOWED_EMAILS
+        sync: false      # Only these addresses can open an account
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false      # Optional: Google Sheets sync
+      - key: GEMINI_API_KEY
+        sync: false      # Optional: reading receipts
+      # No SMTP_* here: the free plan blocks the SMTP ports, and setting them would make
+      # sign-up wait for a verification e-mail that can never arrive. Add them only on a paid plan.

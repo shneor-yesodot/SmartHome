@@ -1,4 +1,8 @@
+const bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
 const userRepository = require('../repositories/user.repository');
+const totp = require('../utils/totp');
+const secretBox = require('../utils/secretBox');
 const categoryManager = require('./category.manager');
 const tokenService = require('../services/token.service');
 const emailService = require('../services/email.service');
@@ -13,6 +17,9 @@ const SESSION_EXPIRED = 'פג תוקף ההתחברות. יש להתחבר מח�
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const RESET_TTL_MS = 60 * 60 * 1000;
+const MAX_FAILED_LOGINS = 5;
+const LOCK_MS = 15 * 60 * 1000;
+const BACKUP_CODES = 8;
 
 /**
  * E-mail verification needs a way to deliver the code. Without SMTP
@@ -20,13 +27,48 @@ const RESET_TTL_MS = 60 * 60 * 1000;
  */
 const verificationEnabled = () => isSmtpConfigured;
 
+/**
+ * Who may open an account. With ALLOWED_EMAILS set: only those addresses.
+ * Without it: nobody in production (the household's finances are not a public
+ * sign-up page), anybody in development.
+ */
+const mayRegister = (email) =>
+  env.allowedEmails.length ? env.allowedEmails.includes(String(email).toLowerCase()) : !env.isProd;
+
+// Compared against when the user does not exist, so both cases take the same time
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 12);
+
 /** Issues an access token + a new refresh token, and saves the refresh token's id on the user. */
 const buildSession = async (user) => {
   const refresh = tokenService.signRefreshToken(user.id);
   user.addSession(refresh.jti, refresh.expiresAt);
   user.lastLoginAt = new Date();
   await user.save();
-  return { user: user.toJSON(), token: tokenService.signAccessToken(user.id), refreshToken: refresh.token };
+  return {
+    user: user.toJSON(),
+    token: tokenService.signAccessToken(user.id),
+    refreshToken: refresh.token, // the controller moves it into an httpOnly cookie
+    refreshExpiresAt: refresh.expiresAt,
+  };
+};
+
+/** A session, or - when the account has an authenticator app - a request for its code. */
+const completeLogin = async (user) => {
+  if (!user.twoFactorEnabled) return buildSession(user);
+  await user.save();
+  return { twoFactorRequired: true, challenge: tokenService.signTwoFactorChallenge(user.id) };
+};
+
+const isLocked = (user) => Boolean(user.lockedUntil && user.lockedUntil > new Date());
+
+/** Every failed attempt counts; too many lock the account for a while. */
+const recordFailure = async (user) => {
+  user.failedLogins = (user.failedLogins || 0) + 1;
+  if (user.failedLogins >= MAX_FAILED_LOGINS) {
+    user.lockedUntil = new Date(Date.now() + LOCK_MS);
+    user.failedLogins = 0;
+  }
+  await user.save();
 };
 
 const sendVerificationCode = async (user) => {
@@ -38,9 +80,15 @@ const sendVerificationCode = async (user) => {
 
 const pendingVerification = (user) => ({ verificationRequired: true, email: user.email });
 
-const publicConfig = () => ({ google: googleService.isConfigured(), emailVerification: verificationEnabled() });
+const publicConfig = () => ({
+  google: googleService.isConfigured(),
+  emailVerification: verificationEnabled(),
+  // false hides the sign-up link. With an allow-list the page stays reachable for the people on it.
+  registration: env.allowedEmails.length > 0 || !env.isProd,
+});
 
 const register = async ({ name, email, password }) => {
+  if (!mayRegister(email)) throw ApiError.forbidden('ההרשמה למערכת סגורה. פנו לבעל המערכת');
   if (await userRepository.findByEmail(email)) {
     throw ApiError.conflict('כבר קיים חשבון עם כתובת האימייל הזו');
   }
@@ -56,10 +104,19 @@ const register = async ({ name, email, password }) => {
 };
 
 const login = async ({ email, password }) => {
-  const user = await userRepository.findByEmail(email, ['password', 'sessions', 'otp']);
-  if (!user || !(await user.comparePassword(password))) {
+  const user = await userRepository.findByEmail(email, ['password', 'sessions', 'otp', 'failedLogins', 'lockedUntil']);
+  if (!user) {
+    await bcrypt.compare(password, DUMMY_HASH);
     throw ApiError.unauthorized(INVALID_CREDENTIALS);
   }
+  // A locked account answers exactly like a wrong password: it reveals nothing, even to the right guess
+  if (isLocked(user)) throw ApiError.unauthorized(INVALID_CREDENTIALS);
+  if (!(await user.comparePassword(password))) {
+    await recordFailure(user);
+    throw ApiError.unauthorized(INVALID_CREDENTIALS);
+  }
+  user.failedLogins = 0;
+  user.lockedUntil = undefined;
   if (!user.emailVerified) {
     if (!verificationEnabled()) {
       // SMTP was removed after the account was created - nothing to verify with
@@ -69,7 +126,84 @@ const login = async ({ email, password }) => {
       return pendingVerification(user);
     }
   }
+  return completeLogin(user);
+};
+
+/** A backup code works once. Returns true when the code was one of them. */
+const consumeBackupCode = (user, code) => {
+  const hash = tokenService.hashSecret(String(code).toLowerCase());
+  const codes = user.twoFactor.backupCodes || [];
+  if (!codes.includes(hash)) return false;
+  const { secret, lastStep } = user.twoFactor;
+  user.twoFactor = { secret, lastStep, backupCodes: codes.filter((c) => c !== hash) };
+  return true;
+};
+
+/** Checks an authenticator or backup code; an accepted authenticator code cannot be replayed. */
+const checkSecondFactor = (user, code) => {
+  const { secret, lastStep, backupCodes } = user.twoFactor || {};
+  if (!secret) return false;
+  const step = /^\d{6}$/.test(code) ? totp.verify(secretBox.decrypt(secret), code, { afterStep: lastStep ?? -1 }) : null;
+  if (step !== null) {
+    user.twoFactor = { secret, lastStep: step, backupCodes };
+    return true;
+  }
+  return consumeBackupCode(user, code);
+};
+
+/** Second step of a login: the challenge from the password step + a code. */
+const loginTwoFactor = async ({ challenge, code }) => {
+  let payload;
+  try {
+    payload = tokenService.verifyTwoFactorChallenge(challenge);
+  } catch {
+    throw ApiError.unauthorized('פג תוקף ההתחברות. יש להתחבר מחדש');
+  }
+  const user = await userRepository.findById(payload.sub, ['twoFactor', 'sessions', 'failedLogins', 'lockedUntil']);
+  if (!user || isLocked(user) || !checkSecondFactor(user, code)) {
+    if (user && !isLocked(user)) await recordFailure(user);
+    throw ApiError.unauthorized('הקוד שגוי');
+  }
+  user.failedLogins = 0;
   return buildSession(user);
+};
+
+/** Step 1 of turning the authenticator on: a new secret to scan. Off until a code confirms it. */
+const twoFactorSetup = async (userId, { password }) => {
+  const user = await userRepository.findById(userId, ['password', 'twoFactor']);
+  if (!(await user.comparePassword(password))) throw ApiError.badRequest('הסיסמה שגויה');
+  if (user.twoFactorEnabled) throw ApiError.conflict('אימות דו-שלבי כבר פעיל');
+  const secret = totp.generateSecret();
+  user.twoFactor = { secret: secretBox.encrypt(secret), backupCodes: [] };
+  await user.save();
+  const url = totp.otpauthUrl({ secret, account: user.email });
+  return { secret, url, qr: await QRCode.toDataURL(url, { margin: 1, width: 220 }) };
+};
+
+/** Step 2: a code from the app proves it was set up. The backup codes are shown only this once. */
+const twoFactorEnable = async (userId, { code }) => {
+  const user = await userRepository.findById(userId, ['twoFactor']);
+  if (user.twoFactorEnabled) throw ApiError.conflict('אימות דו-שלבי כבר פעיל');
+  const secret = user.twoFactor?.secret;
+  if (!secret) throw ApiError.badRequest('התחילו מחדש את הגדרת האימות הדו-שלבי');
+  const step = totp.verify(secretBox.decrypt(secret), code);
+  if (step === null) throw ApiError.badRequest('הקוד שגוי. ודאו שהשעה בטלפון מדויקת');
+  const codes = Array.from({ length: BACKUP_CODES }, () => tokenService.randomToken().slice(0, 10));
+  user.twoFactor = { secret, lastStep: step, backupCodes: codes.map((c) => tokenService.hashSecret(c)) };
+  user.twoFactorEnabled = true;
+  await user.save();
+  return { user: user.toJSON(), backupCodes: codes };
+};
+
+const twoFactorDisable = async (userId, { password, code }) => {
+  const user = await userRepository.findById(userId, ['password', 'twoFactor']);
+  if (!user.twoFactorEnabled) throw ApiError.conflict('אימות דו-שלבי אינו פעיל');
+  if (!(await user.comparePassword(password))) throw ApiError.badRequest('הסיסמה שגויה');
+  if (!checkSecondFactor(user, code)) throw ApiError.badRequest('הקוד שגוי');
+  user.twoFactor = undefined;
+  user.twoFactorEnabled = false;
+  await user.save();
+  return { user: user.toJSON() };
 };
 
 const verifyEmail = async ({ email, code }) => {
@@ -113,7 +247,10 @@ const resetPassword = async ({ token, password }) => {
   user.passwordReset = undefined;
   user.emailVerified = true;
   user.sessions = [];
-  return buildSession(user);
+  user.failedLogins = 0;
+  user.lockedUntil = undefined;
+  // The e-mail link proves one factor only: it never skips the authenticator app
+  return completeLogin(user);
 };
 
 /**
@@ -123,6 +260,7 @@ const resetPassword = async ({ token, password }) => {
  */
 const refresh = async ({ refreshToken }) => {
   let payload;
+  if (!refreshToken) throw ApiError.unauthorized(SESSION_EXPIRED);
   try {
     payload = tokenService.verifyRefreshToken(refreshToken);
   } catch {
@@ -210,6 +348,7 @@ const googleCallback = async ({ code, state, nonce }) => {
       user.googleId = profile.id;
       user.emailVerified = true;
     } else {
+      if (!mayRegister(profile.email)) throw ApiError.forbidden('ההרשמה למערכת סגורה');
       const name = (profile.name || profile.email.split('@')[0]).trim().slice(0, 60);
       user = await userRepository.create({
         name: name.length >= 2 ? name : 'משתמש',
@@ -223,13 +362,17 @@ const googleCallback = async ({ code, state, nonce }) => {
       user = await userRepository.findById(user.id, ['sessions']);
     }
   }
-  return { session: await buildSession(user), returnTo: payload.returnTo };
+  return { session: await completeLogin(user), returnTo: payload.returnTo };
 };
 
 module.exports = {
   publicConfig,
   register,
   login,
+  loginTwoFactor,
+  twoFactorSetup,
+  twoFactorEnable,
+  twoFactorDisable,
   verifyEmail,
   resendCode,
   forgotPassword,

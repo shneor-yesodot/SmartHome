@@ -43,6 +43,16 @@ const verifyOAuthState = (token) => {
   return payload;
 };
 
+/** Proves the password step passed; only good for finishing the two-factor step of a login. */
+const signTwoFactorChallenge = (userId) =>
+  jwt.sign({ sub: String(userId), typ: '2fa' }, env.jwt.secret, { ...OPTIONS, expiresIn: '5m' });
+
+const verifyTwoFactorChallenge = (token) => {
+  const payload = jwt.verify(token, env.jwt.secret, { algorithms: ['HS256'] });
+  if (payload.typ !== '2fa') throw new Error('not a two-factor challenge');
+  return payload;
+};
+
 /** One-way hash for codes and reset tokens kept in the database. */
 const hashSecret = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 
@@ -56,6 +66,8 @@ module.exports = {
   verifyRefreshToken,
   signOAuthState,
   verifyOAuthState,
+  signTwoFactorChallenge,
+  verifyTwoFactorChallenge,
   hashSecret,
   randomCode,
   randomToken,

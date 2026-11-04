@@ -57,6 +57,18 @@ export default function MonthSummary({ summary, period }) {
         />
       </div>
 
+      {summary.byAccount?.length > 0 && (
+        <div className="mt-6">
+          <Section
+            title="לפי אמצעי תשלום"
+            total={totals.expense}
+            tone="text-danger-500"
+            rows={summary.byAccount.map((a) => ({ key: a.accountId, name: a.name, color: a.color, total: a.total }))}
+            empty=""
+          />
+        </div>
+      )}
+
       <dl className="tabular mt-6 grid gap-3 rounded-xl bg-surface p-4 text-sm sm:grid-cols-3">
         <div className="flex justify-between gap-2 sm:block">
           <dt className="text-ink-muted">סה״כ הכנסות</dt>

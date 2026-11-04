@@ -3,12 +3,10 @@ import { UserRound } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Switch from '../ui/Switch';
-import Segmented from '../ui/Segmented';
 import { Field, Input } from '../ui/Field';
 import { useAuth } from '../../context/AuthContext';
 import { useAction } from '../../hooks/useAction';
 import { authService } from '../../services/auth.service';
-import { CALENDAR_OPTIONS } from '../../constants/options';
 
 const NOTIFICATIONS = [
   { key: 'budgetAlerts', label: 'התראות תקציב', text: 'מייל כשמתקרבים לתקרת התקציב או חורגים ממנה' },
@@ -46,19 +44,6 @@ export default function ProfileCard() {
       </form>
 
       <ul className="mt-6 divide-y divide-line border-t border-line">
-        <li className="flex flex-wrap items-center justify-between gap-4 py-4">
-          <div>
-            <p className="text-sm font-semibold">לוח שנה</p>
-            <p className="text-sm text-ink-muted">לפי אילו חודשים מחושבים הדשבורד, התקציבים, היעדים והדוחות</p>
-          </div>
-          <Segmented
-            label="לוח שנה"
-            options={CALENDAR_OPTIONS}
-            value={user.calendar || 'gregorian'}
-            disabled={pending}
-            onChange={(calendar) => save({ calendar }, calendar === 'hebrew' ? 'החודשים יחושבו לפי הלוח העברי' : 'החודשים יחושבו לפי הלוח הלועזי')}
-          />
-        </li>
         {NOTIFICATIONS.map(({ key, label, text }) => (
           <li key={key} className="flex items-center justify-between gap-4 py-4">
             <div>

@@ -14,7 +14,7 @@ export default function Topbar({ onMenu }) {
         <button className="icon-btn lg:hidden" onClick={onMenu} aria-label="פתיחת התפריט">
           <Menu className="h-5 w-5" />
         </button>
-        <p className="text-lg font-bold">{titleForPath(pathname)}</p>
+        <p className="whitespace-nowrap text-lg font-bold">{titleForPath(pathname)}</p>
       </div>
 
       <div className="flex min-w-0 items-center gap-3">

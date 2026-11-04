@@ -31,7 +31,9 @@ const send = async ({ to, subject, html, devNote }) => {
   try {
     const info = await transporter.sendMail({ from: env.smtp.from, to, subject, html });
     if (!isSmtpConfigured) {
-      logger.info(`[mail:preview] to=${to} subject="${subject}" (SMTP not configured)${devNote ? ` -> ${devNote}` : ''}`);
+      // Codes and reset links never reach the log of a real deployment
+      const note = devNote && !env.isProd ? ` -> ${devNote}` : '';
+      logger.info(`[mail:preview] to=${to} subject="${subject}" (SMTP not configured)${note}`);
     }
     return info;
   } catch (err) {
