@@ -13,4 +13,20 @@ const toProductKey = (name) =>
 
 const cleanText = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
-module.exports = { escapeRegex, toProductKey, cleanText };
+const merchantWords = (name) =>
+  String(name || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+
+/**
+ * Whether two names probably mean the same store. Statements and receipts spell it
+ * differently ("שופרסל דיל 123" against "שופרסל"), so one shared word is enough.
+ */
+const sameMerchant = (a, b) => {
+  const words = new Set(merchantWords(a));
+  return merchantWords(b).some((w) => words.has(w));
+};
+
+module.exports = { escapeRegex, toProductKey, cleanText, sameMerchant };

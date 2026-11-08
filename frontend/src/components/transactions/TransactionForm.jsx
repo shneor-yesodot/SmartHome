@@ -6,6 +6,8 @@ import TypeToggle from '../ui/TypeToggle';
 import { Field, Input, Select } from '../ui/Field';
 import BasketItems, { basketTotal, newItem } from './BasketItems';
 import SplitForm from './SplitForm';
+import PaymentMatch from './PaymentMatch';
+import PurchaseItems from './PurchaseItems';
 import { useCategories } from '../../context/CategoriesContext';
 import { useToast } from '../../context/ToastContext';
 import { useAction } from '../../hooks/useAction';
@@ -68,6 +70,8 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
 
   // A new expense can hold several products; each one is saved as its own transaction
   const [items, setItems] = useState([]);
+  const [payment, setPayment] = useState(null); // an imported statement line these items replace
+  const [purchaseSize, setPurchaseSize] = useState(0); // items bought together with the one being edited
   const [receipt, setReceipt] = useState(null); // scanned in this dialog, not saved yet
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef(null);
@@ -143,11 +147,12 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
     const payload = {
       merchant: form.merchant,
       date: form.date,
+      payment,
       items: items.map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity) || 1, total: Number(i.total), category: i.category || null })),
     };
     const { ok } = await run(
       () => (receipt ? receiptService.confirm(receipt.id, payload) : transactionService.createBasket({ ...payload, notes: form.notes, account: form.account || null })),
-      `נשמרו ${items.length} מוצרים כעסקאות`
+      payment ? `נשמרו ${items.length} מוצרים במקום שורת החיוב` : `נשמרו ${items.length} מוצרים כעסקאות`
     );
     if (ok) {
       savedRef.current = true;
@@ -206,6 +211,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {transaction?.purchase && <PurchaseItems transaction={transaction} onLoad={setPurchaseSize} />}
       {!basket && <TypeToggle value={form.type} onChange={(type) => setForm((f) => ({ ...f, type, category: '' }))} />}
 
       {canAddProducts && (
@@ -251,8 +257,9 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
             {merchantField}
             {dateField}
           </div>
-          {!receipt && accountField}
+          {!receipt && !payment && accountField}
           <BasketItems items={items} onChange={changeItems} categories={categories} />
+          <PaymentMatch date={form.date} total={basketTotal(items)} merchant={form.merchant} value={payment} onChange={setPayment} />
         </>
       ) : (
         <>
@@ -326,7 +333,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
       )}
 
       <div className="flex justify-end gap-2 pt-1">
-        {transaction?.type === 'expense' && !transaction.purchase && (
+        {transaction?.type === 'expense' && (!transaction.purchase || purchaseSize === 1) && (
           <Button variant="secondary" className="me-auto" onClick={onSplit}>
             פיצול לפריטים
           </Button>

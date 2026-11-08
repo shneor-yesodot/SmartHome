@@ -75,6 +75,8 @@ const basket = Joi.object({
   date: fields.date.required(),
   notes: fields.notes,
   account: fields.account,
+  // An imported statement line these items replace, instead of counting the money again
+  payment: objectId().allow(null),
   items: Joi.array().items(purchaseItem).min(1).max(200).required().label('מוצרים'),
 });
 
@@ -83,4 +85,11 @@ const split = Joi.object({
   items: Joi.array().items(purchaseItem).min(2).max(200).required().label('מוצרים'),
 });
 
-module.exports = { create, update, listQuery, bulkCreate, basket, split };
+// A purchase about to be saved: which imported statement lines it may be
+const paymentQuery = Joi.object({
+  date: fields.date.required(),
+  total: money().required(),
+  merchant: shortText(80).allow(''),
+});
+
+module.exports = { create, update, listQuery, bulkCreate, basket, split, paymentQuery };

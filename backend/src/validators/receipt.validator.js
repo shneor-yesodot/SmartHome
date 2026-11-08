@@ -4,6 +4,8 @@ const { objectId, money, shortText } = require('./common.validator');
 const confirm = Joi.object({
   merchant: shortText(80).allow('').default('').label('בית עסק'),
   date: Joi.date().iso().required().label('תאריך הקנייה'),
+  // An imported statement line these items replace (see /transactions/payment-candidates)
+  payment: objectId().allow(null),
   items: Joi.array()
     .items(
       Joi.object({

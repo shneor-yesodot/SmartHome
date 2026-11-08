@@ -40,6 +40,10 @@ const env = {
   isProd,
   isTest: nodeEnv === 'test',
   port,
+  // Empty = every network interface. The desktop launcher sets 127.0.0.1: only this computer
+  host: process.env.HOST || '',
+  // Started by SmartHome.exe: stop (and close the database cleanly) when the launcher goes away
+  stopWithLauncher: process.env.STOP_WITH_LAUNCHER === 'true',
   clientUrls,
   // The first CLIENT_URL is where e-mail links and the Google login send the user back to
   clientUrl: clientUrls[0],

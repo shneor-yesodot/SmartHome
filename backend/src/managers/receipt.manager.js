@@ -63,16 +63,16 @@ const scan = async (userId, file) => {
 };
 
 /** Step 2 - the reviewed lines become transactions, one per product. */
-const confirm = async (userId, id, { merchant, date, items }) => {
+const confirm = async (userId, id, { merchant, date, items, payment }) => {
   const receipt = await receiptRepository.findOneByUser(userId, id);
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
   if (receipt.status === 'confirmed') throw ApiError.conflict('הקבלה הזו כבר נשמרה כעסקאות');
 
-  const rows = transactionManager.itemsToRows({ merchant, date, items });
-  const transactions = await transactionManager.bulkCreate(userId, rows, {
-    source: 'receipt',
-    extra: { receipt: receipt._id },
-  });
+  const rows = transactionManager.itemsToRows({ merchant, date, items }, { group: true });
+  const options = { source: 'receipt', extra: { receipt: receipt._id } };
+  // Already on an imported statement: the items take that line's place instead of counting again
+  const linked = payment ? await transactionManager.attachToPayment(userId, payment, rows, options) : null;
+  const created = linked ? linked.created : (await transactionManager.bulkCreate(userId, rows, options)).length;
 
   receipt.set({
     merchant,
@@ -80,10 +80,10 @@ const confirm = async (userId, id, { merchant, date, items }) => {
     items: items.map((item) => ({ ...item, unitPrice: round2(item.total / item.quantity) })),
     total: round2(items.reduce((s, i) => s + i.total, 0)),
     status: 'confirmed',
-    transactionsCount: transactions.length,
+    transactionsCount: created,
   });
   await receipt.save();
-  return { receipt, created: transactions.length };
+  return { receipt, created, linked: Boolean(linked), adjusted: linked?.adjusted || 0 };
 };
 
 /** Newest first, with the category of every product line. */

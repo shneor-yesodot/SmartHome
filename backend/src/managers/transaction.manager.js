@@ -9,7 +9,8 @@ const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { addDays } = require('../utils/dateUtils');
 const { round2 } = require('../utils/finance');
-const { escapeRegex, toProductKey } = require('../utils/text');
+const { escapeRegex, toProductKey, sameMerchant } = require('../utils/text');
+const { NEARBY_DAYS, ADJUSTMENT_NAME, isNear, isClose, rank, fitToCharge } = require('../utils/purchaseMatch');
 
 const MAX_EXPORT_ROWS = 5000;
 const POPULATE = 'category account';
@@ -142,44 +143,132 @@ const remove = async (userId, id) => {
   }
 };
 
+/** A category of the user for an expense item, or "other" when none was chosen. */
+const expenseCategory = async (userId, id) =>
+  id ? (await categoryManager.assertOwned(userId, id, 'expense'))._id : (await categoryManager.getFallback(userId, 'expense'))._id;
+
+/**
+ * Turns one transaction, usually a statement line, into items whose total equals it.
+ * The original stays as the first item, so its statement fingerprint, card and charge
+ * date stay too, and importing the statement again does not add it back.
+ */
+const replaceWithItems = async (userId, original, rows, { source = original.source, extra = {} } = {}) => {
+  const [first, ...rest] = rows;
+  const before = original.toObject();
+  original.set(normalize({ ...first, category: await expenseCategory(userId, first.category), source, ...extra }));
+  await original.save();
+  try {
+    const created = await bulkCreate(userId, rest, {
+      source,
+      extra: { account: original.account, chargeDate: original.chargeDate, receipt: original.receipt, recurring: original.recurring, ...extra },
+    });
+    triggerBudgetAlerts(userId, [original.category]);
+    return created.length + 1;
+  } catch (err) {
+    original.overwrite(before);
+    await original.save();
+    throw err;
+  }
+};
+
+/** A statement line that may still be broken into items: one of its own, or a purchase of one item. */
+const loadSplittable = async (userId, id) => {
+  const original = await transactionRepository.findOneByUser(userId, id, { select: '+importHash' });
+  if (!original) return null;
+  if (original.purchase && (await transactionRepository.findPurchase(userId, original.purchase)).length > 1) {
+    throw ApiError.conflict('העסקה הזו כבר חלק מקנייה עם כמה פריטים');
+  }
+  return original;
+};
+
 /**
  * Turns one transaction, usually a statement line, into the items it was made of.
  * Their total must equal the original, so the books and the card stay the same.
  */
 const split = async (userId, id, { items }) => {
-  const original = await transactionRepository.findOneByUser(userId, id);
+  const original = await loadSplittable(userId, id);
   if (!original) throw ApiError.notFound('העסקה לא נמצאה');
   if (original.type !== 'expense') throw ApiError.badRequest('אפשר לפצל רק הוצאה');
-  if (original.purchase) throw ApiError.conflict('העסקה הזו כבר חלק מקנייה מפוצלת');
 
   const total = round2(items.reduce((s, i) => s + i.total, 0));
   if (total !== round2(original.amount)) {
     throw ApiError.badRequest(`סכום הפריטים (${total}) חייב להיות שווה לסכום העסקה (${round2(original.amount)})`);
   }
-
-  const before = { amount: original.amount, description: original.description };
-  const [first, ...rest] = itemsToRows({
+  const rows = itemsToRows({
     merchant: original.merchant || original.description.slice(0, 80),
     date: original.date,
     notes: original.notes,
     items: items.map((i) => ({ ...i, category: i.category || original.category })),
   });
-  // The original stays as the first item, so its statement fingerprint stays too
-  const { category: firstCategory } = first;
-  await categoryManager.assertOwned(userId, firstCategory, 'expense');
-  original.set(normalize(first));
-  await original.save();
-  try {
-    const created = await bulkCreate(userId, rest, {
-      source: original.source,
-      extra: { account: original.account, chargeDate: original.chargeDate, receipt: original.receipt, recurring: original.recurring },
-    });
-    return { created: created.length + 1, total };
-  } catch (err) {
-    original.set({ ...before, purchase: undefined, productName: undefined, productKey: undefined, unitPrice: undefined, quantity: 1 });
-    await original.save();
-    throw err;
+  return { created: await replaceWithItems(userId, original, rows), total };
+};
+
+/** Lines of the card or bank statement that a purchase being saved now probably is. */
+const paymentCandidates = async (userId, { date, total, merchant }) => {
+  const lines = await transactionRepository.findPaymentCandidates(userId, addDays(date, -NEARBY_DAYS), addDays(date, NEARBY_DAYS + 1));
+  const target = { amount: total, merchant, date };
+  return lines
+    .filter((t) => isNear(t.date, date) && isClose(t.amount, total))
+    .map((t) => ({ ...t, merchant: t.merchant || t.description }))
+    .sort(rank(target))
+    .slice(0, 5)
+    .map((t) => ({
+      id: String(t._id),
+      description: t.description,
+      date: t.date,
+      chargeDate: t.chargeDate,
+      amount: t.amount,
+      account: t.account ? { name: t.account.name, color: t.account.color } : null,
+      diff: round2(t.amount - total),
+      sameMerchant: Boolean(merchant) && sameMerchant(t.merchant, merchant),
+    }));
+};
+
+/**
+ * The items being saved replace a statement line that already paid for them, so the
+ * money counts once. A small difference is taken up by the items (see fitToCharge).
+ */
+const attachToPayment = async (userId, paymentId, rows, options) => {
+  const payment = await loadSplittable(userId, paymentId);
+  const total = round2(rows.reduce((s, r) => s + r.amount, 0));
+  const fit = payment && fitToCharge(rows.map((r) => r.amount), payment.amount);
+  if (!payment || payment.type !== 'expense' || !payment.importHash || !isNear(payment.date, rows[0].date) || !isClose(payment.amount, total) || !fit) {
+    throw ApiError.conflict('החיוב שנבחר לא מתאים לקנייה הזו. אפשר לשמור בלי לקשר');
   }
+
+  const fitted = rows.map((r, i) => (fit.reduce?.index === i ? { ...r, amount: fit.reduce.amount, unitPrice: round2(fit.reduce.amount / r.quantity) } : r));
+  if (fit.add > 0) {
+    const largest = rows.reduce((a, b) => (b.amount > a.amount ? b : a));
+    fitted.push({ ...rows[0], amount: fit.add, category: largest.category, description: ADJUSTMENT_NAME, productName: undefined, quantity: 1, unitPrice: undefined });
+  }
+  const purchase = new mongoose.Types.ObjectId();
+  const created = await replaceWithItems(userId, payment, fitted.map((r) => ({ ...r, purchase })), options);
+  return { created, total: payment.amount, linked: true, adjusted: fit.diff };
+};
+
+/** All the items of the purchase a transaction belongs to, with what paid for them. */
+const getPurchase = async (userId, id) => {
+  const transaction = await getById(userId, id);
+  const items = transaction.purchase ? await transactionRepository.findPurchase(userId, transaction.purchase).populate(POPULATE) : [transaction];
+  const paidBy = items.find((t) => t.account) || transaction;
+  return {
+    merchant: transaction.merchant,
+    date: transaction.date,
+    account: paidBy.account || null,
+    chargeDate: paidBy.chargeDate || null,
+    total: round2(items.reduce((s, t) => s + t.amount, 0)),
+    // The card or bank statement line was linked to these items
+    matched: items.some((t) => t.importHash),
+    items: items.map((t) => ({
+      id: t.id,
+      description: t.description,
+      productName: t.productName,
+      quantity: t.quantity,
+      unitPrice: t.unitPrice,
+      amount: t.amount,
+      category: t.category,
+    })),
+  };
 };
 
 /**
@@ -244,9 +333,12 @@ const previewImport = async (userId, file) => {
   };
 };
 
-/** Product lines of one purchase (manual basket or receipt) as expense rows. */
-const itemsToRows = ({ merchant, date, notes, items }) => {
-  const purchase = items.length > 1 ? new mongoose.Types.ObjectId() : undefined;
+/**
+ * Product lines of one purchase (manual basket or receipt) as expense rows. A receipt
+ * is a purchase even with one product, so its card charge can find it later.
+ */
+const itemsToRows = ({ merchant, date, notes, items }, { group = items.length > 1 } = {}) => {
+  const purchase = group ? new mongoose.Types.ObjectId() : undefined;
   return items.map((item) => ({
     ...(purchase ? { purchase } : {}),
     type: 'expense',
@@ -263,7 +355,8 @@ const itemsToRows = ({ merchant, date, notes, items }) => {
 };
 
 /** A purchase with several products, entered by hand - one transaction per product. */
-const createBasket = async (userId, basket) => {
+const createBasket = async (userId, { payment, ...basket }) => {
+  if (payment) return attachToPayment(userId, payment, itemsToRows(basket, { group: true }), { source: 'manual' });
   const charge = await accountManager.resolveCharge(userId, basket.account, basket.date);
   const transactions = await bulkCreate(userId, itemsToRows(basket), { source: 'manual', extra: charge });
   return { created: transactions.length, total: round2(basket.items.reduce((s, i) => s + i.total, 0)) };
@@ -276,6 +369,9 @@ module.exports = {
   update,
   remove,
   split,
+  paymentCandidates,
+  attachToPayment,
+  getPurchase,
   bulkCreate,
   itemsToRows,
   createBasket,

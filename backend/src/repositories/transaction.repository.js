@@ -77,6 +77,20 @@ class TransactionRepository extends BaseRepository {
     return this.model.find({ user: userId, purchase }).sort({ createdAt: 1, _id: 1 }).select('+importHash');
   }
 
+  /** Imported expense lines in [from, to) that are not broken into items yet. */
+  findPaymentCandidates(userId, from, to) {
+    return this.model
+      .find({
+        user: userId,
+        type: 'expense',
+        importHash: { $type: 'string' },
+        purchase: { $exists: false },
+        date: { $gte: from, $lt: to },
+      })
+      .populate('account')
+      .lean();
+  }
+
   /** The statement line that paid for a purchase: its card reaches every item, its fingerprint one. */
   async linkPurchase(userId, purchase, firstItemId, { account, chargeDate, importHash }) {
     const payment = account ? { account, ...(chargeDate ? { chargeDate } : {}) } : {};

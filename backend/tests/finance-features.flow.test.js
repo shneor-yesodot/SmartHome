@@ -137,6 +137,94 @@ describe('purchases made of items', () => {
     expect((await call(`/transactions/${imported.id}`, { method: 'DELETE' })).status).toBe(204);
     expect((await uploadForm('/imports/statement/preview', [cardHeader, line])).body.data.rows[0].flag).toBe('imported');
   });
+
+  const importLines = async (...lines) => {
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, ...lines]);
+    await call('/imports/statement/commit', { method: 'POST', body: { rows: preview.body.data.rows.map(pick) } });
+  };
+  const scannedReceipt = async () => {
+    const user = await mongoose.model('User').findOne({ email: 'cards@example.com' });
+    return mongoose.model('Receipt').create({ user: user._id, mimeType: 'image/png' });
+  };
+
+  it('a receipt saved after its card line replaces that line, evened out to the charge', async () => {
+    const line = ['15/03/2026', 'שופרסל דיל 123', '3333', 150, '10/04/2026'];
+    await importLines(line, ['15/03/2026', 'בית מרקחת', '3333', 149, '10/04/2026']);
+
+    const candidates = await call('/transactions/payment-candidates?date=2026-03-15&total=148&merchant=' + encodeURIComponent('שופרסל'));
+    expect(candidates.body.data.map((c) => c.description)).toEqual(['שופרסל דיל 123', 'בית מרקחת']);
+    expect(candidates.body.data[0]).toMatchObject({ diff: 2, sameMerchant: true });
+
+    const receipt = await scannedReceipt();
+    const saved = await call(`/receipts/${receipt.id}/confirm`, {
+      method: 'POST',
+      body: { merchant: 'שופרסל', date: '2026-03-15', payment: candidates.body.data[0].id, items: [{ name: 'גבינה', total: 100 }, { name: 'לחם', total: 48 }] },
+    });
+    expect(saved.body.data).toMatchObject({ created: 3, linked: true, adjusted: 2 });
+
+    const items = (await call('/transactions?from=2026-03-15&to=2026-03-15&limit=100')).body.data.filter((t) => t.purchase);
+    expect(items.map((t) => t.description).sort()).toEqual(['גבינה', 'הפרש מול החיוב בכרטיס', 'לחם']);
+    expect(items.reduce((s, t) => s + t.amount, 0)).toBeCloseTo(150);
+    items.forEach((t) => expect(t.account.last4).toBe('3333'));
+
+    const purchase = await call(`/transactions/${items[0].id}/purchase`);
+    expect(purchase.body.data).toMatchObject({ total: 150, matched: true });
+    expect(purchase.body.data.items).toHaveLength(3);
+
+    expect((await uploadForm('/imports/statement/preview', [cardHeader, line])).body.data.rows[0].flag).toBe('imported');
+    // Linked once: the same line cannot take a second receipt
+    const again = await call('/transactions/basket', { method: 'POST', body: { date: '2026-03-15', payment: candidates.body.data[0].id, items: [{ name: 'x', total: 150 }] } });
+    expect(again.status).toBe(409);
+  });
+
+  it('a discount comes off the largest item, and a far amount is refused', async () => {
+    await importLines(['18/03/2026', 'ירקן השכונה', '3333', 90, '10/04/2026']);
+    expect((await call('/transactions/payment-candidates?date=2026-03-18&total=95')).body.data).toEqual([]);
+    const [candidate] = (await call('/transactions/payment-candidates?date=2026-03-18&total=94')).body.data;
+    expect(candidate.diff).toBe(-4);
+
+    const far = await call('/transactions/basket', { method: 'POST', body: { date: '2026-03-18', payment: candidate.id, items: [{ name: 'פירות', total: 140 }] } });
+    expect(far.status).toBe(409);
+
+    const saved = await call('/transactions/basket', { method: 'POST', body: { date: '2026-03-18', payment: candidate.id, items: [{ name: 'פירות', total: 60 }, { name: 'ירקות', total: 34 }] } });
+    expect(saved.body.data).toMatchObject({ created: 2, linked: true });
+    const items = (await call('/transactions?from=2026-03-18&to=2026-03-18&limit=100')).body.data;
+    expect(items.find((t) => t.description === 'פירות').amount).toBe(56);
+    expect(items.reduce((s, t) => s + t.amount, 0)).toBeCloseTo(90);
+  });
+
+  it('a close statement line is only offered, and links when the user chooses it', async () => {
+    const food = categoryId('סופר ומזון');
+    await call('/transactions/basket', {
+      method: 'POST',
+      body: { merchant: 'מאפיית הקרוב', date: '2026-03-20', items: [{ name: 'עוגה', total: 50, category: food }, { name: 'פיתות', total: 30.5, category: food }] },
+    });
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, ['21/03/2026', 'מאפיית הקרוב', '3333', 80, '10/04/2026']]);
+    const [row] = preview.body.data.rows;
+    expect(row.flag).toBeNull();
+    expect(row.include).toBe(true);
+    expect(row.suggestion).toMatchObject({ itemCount: 2, total: 80.5, diff: -0.5 });
+
+    const commit = await call('/imports/statement/commit', { method: 'POST', body: { rows: [{ ...pick(row), purchase: row.suggestion.purchase, adjust: true }] } });
+    expect(commit.body.data).toMatchObject({ created: 0, linked: 1 });
+    expect(await netOf('מאפיית הקרוב')).toBeCloseTo(80);
+  });
+
+  it('the same store wins when two purchases have the same total', async () => {
+    const body = (merchant) => ({ merchant, date: '2026-03-25', items: [{ name: 'א', total: 20 }, { name: 'ב', total: 25 }] });
+    await call('/transactions/basket', { method: 'POST', body: body('קפה גרג') });
+    await call('/transactions/basket', { method: 'POST', body: body('פיצה שמש') });
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, ['25/03/2026', 'פיצה שמש סניף 4', '3333', 45, '10/04/2026']]);
+    const pizza = (await itemsNamed('פיצה שמש'))[0];
+    expect(preview.body.data.rows[0]).toMatchObject({ flag: 'items', purchase: pizza.purchase });
+  });
+
+  it('a receipt of one product is still found by its card line', async () => {
+    const receipt = await scannedReceipt();
+    await call(`/receipts/${receipt.id}/confirm`, { method: 'POST', body: { merchant: 'אלקטרו בית', date: '2026-03-27', items: [{ name: 'מטען', total: 89.9 }] } });
+    const preview = await uploadForm('/imports/statement/preview', [cardHeader, ['28/03/2026', 'אלקטרו בית', '3333', 89.9, '10/04/2026']]);
+    expect(preview.body.data.rows[0]).toMatchObject({ flag: 'items', itemCount: 1 });
+  });
 });
 
 describe('categories from a household summary sheet', () => {

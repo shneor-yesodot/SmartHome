@@ -23,9 +23,12 @@ const flagText = (row) => {
   return row.flag === 'duplicate' && row.duplicateOf ? `${FLAGS.duplicate}: ${row.duplicateOf.description}, ${formatDate(row.duplicateOf.date)}` : FLAGS[row.flag];
 };
 
-const toPayload = ({ type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase }) => ({
-  type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase,
+const toPayload = ({ type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase, adjust }) => ({
+  type, amount, category, account, description, date, chargeDate, notes, last4, isRefund, standing, importHash, purchase, adjust,
 });
+
+const suggestionText = ({ itemCount, total, merchant, diff }) =>
+  `קרוב ל-${itemCount} פריטים שרשמתם${merchant ? ` ב${merchant}` : ''} (${formatMoney(total)}, הפרש ${formatMoney(Math.abs(diff))}). אם זו אותה קנייה, ההפרש יירשם בפריטים וההוצאה תיספר פעם אחת`;
 
 /** Choose a statement -> review each line (the risky ones start switched off) -> save. */
 export default function ImportStatementModal({ open, onClose, onImported }) {
@@ -114,6 +117,7 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
             {preview.summary.imported > 0 && <Badge>{preview.summary.imported} כבר יובאו בעבר</Badge>}
             {preview.summary.settlements > 0 && <Badge tone="warning">{preview.summary.settlements} חיובי כרטיס בעו״ש</Badge>}
             {preview.summary.linkedPurchases > 0 && <Badge tone="success">{preview.summary.linkedPurchases} יקושרו לפריטים שנרשמו</Badge>}
+            {preview.summary.suggestedPurchases > 0 && <Badge tone="warning">{preview.summary.suggestedPurchases} קרובות לפריטים שנרשמו, לבדיקה</Badge>}
             {preview.summary.cashWithdrawals > 0 &&<Badge tone="warning">{preview.summary.cashWithdrawals} משיכות מזומן</Badge>}
             {preview.summary.duplicates > 0 &&<Badge tone="warning">{preview.summary.duplicates} ייתכן שכבר נרשמו</Badge>}
           </div>
@@ -165,6 +169,17 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
                       {r.standing && ' · הוראת קבע'}
                     </p>
                     {r.flag && <p className="mt-0.5 text-xs text-warn-600">{flagText(r)}</p>}
+                    {r.suggestion && (
+                      <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs text-brand-700">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-brand-500"
+                          checked={Boolean(r.purchase)}
+                          onChange={(e) => patch(r.row, e.target.checked ? { purchase: r.suggestion.purchase, adjust: true, include: true } : { purchase: null, adjust: false })}
+                        />
+                        <span>{suggestionText(r.suggestion)}</span>
+                      </label>
+                    )}
                   </div>
                   <span className={`tabular whitespace-nowrap text-sm font-semibold sm:order-last ${r.type === 'income' ? 'text-brand-600' : ''}`}>
                     {r.type === 'income' ? '+' : ''}

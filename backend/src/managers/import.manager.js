@@ -9,8 +9,8 @@ const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { addDays } = require('../utils/dateUtils');
 const { round2 } = require('../utils/finance');
+const { NEARBY_DAYS, ADJUSTMENT_NAME, isNear, isClose, rank, fitToCharge } = require('../utils/purchaseMatch');
 
-const NEARBY_DAYS = 3;
 const HISTORY_LIMIT = 3000;
 
 // First guess for a merchant nobody has categorized yet; the user's own history always wins.
@@ -72,7 +72,8 @@ const learnedCategories = async (userId, lines) => {
  * order the app posted, or an expense typed by hand. Each one matches one line only.
  */
 const nearbyMatcher = async (userId, lines) => {
-  if (!lines.length) return { single: () => null, purchase: () => null };
+  const none = () => null;
+  if (!lines.length) return { single: none, purchase: none, nearPurchase: none };
   const dates = lines.map((l) => new Date(l.date).getTime());
   const from = addDays(new Date(Math.min(...dates)), -NEARBY_DAYS);
   const to = addDays(new Date(Math.max(...dates)), NEARBY_DAYS + 1);
@@ -80,32 +81,37 @@ const nearbyMatcher = async (userId, lines) => {
     transactionRepository.findInRange(userId, from, to, { filter: { source: { $in: ['manual', 'recurring'] }, purchase: { $exists: false } } }),
     transactionRepository.findPurchaseItems(userId, from, to),
   ]);
-  const isNear = (date, line) => Math.abs(new Date(date) - new Date(line.date)) <= NEARBY_DAYS * 86400000;
 
   // Purchases still waiting for their statement line
   const purchases = new Map();
   items.forEach((t) => {
     const key = String(t.purchase);
-    const group = purchases.get(key) || { id: key, date: t.date, total: 0, count: 0, linked: false };
-    group.total = round2(group.total + t.amount);
+    const group = purchases.get(key) || { id: key, date: t.date, merchant: t.merchant, amount: 0, count: 0, linked: false };
+    group.amount = round2(group.amount + t.amount);
     group.count += 1;
     group.linked = group.linked || Boolean(t.importHash);
     purchases.set(key, group);
   });
 
   const used = new Set();
+  // The same store wins when several purchases fit, then the nearest date
+  const bestPurchase = (line, fits) => {
+    if (line.type !== 'expense') return null;
+    const [match] = [...purchases.values()]
+      .filter((p) => !p.linked && !used.has(p.id) && isNear(p.date, line.date) && fits(p))
+      .sort(rank({ amount: line.amount, merchant: line.description, date: line.date }));
+    if (match) used.add(match.id);
+    return match || null;
+  };
   return {
     single: (line) => {
-      const match = existing.find((t) => !used.has(String(t._id)) && t.type === line.type && round2(t.amount) === line.amount && isNear(t.date, line));
+      const match = existing.find((t) => !used.has(String(t._id)) && t.type === line.type && round2(t.amount) === line.amount && isNear(t.date, line.date));
       if (match) used.add(String(match._id));
       return match || null;
     },
-    purchase: (line) => {
-      if (line.type !== 'expense') return null;
-      const match = [...purchases.values()].find((p) => !p.linked && !used.has(p.id) && p.total === line.amount && isNear(p.date, line));
-      if (match) used.add(match.id);
-      return match || null;
-    },
+    purchase: (line) => bestPurchase(line, (p) => p.amount === line.amount),
+    // Only offered: the user decides whether it is the same purchase
+    nearPurchase: (line) => bestPurchase(line, (p) => isClose(p.amount, line.amount)),
   };
 };
 
@@ -152,6 +158,10 @@ const preview = async (userId, file) => {
     if (purchase) return { ...row, category: null, flag: 'items', purchase: purchase.id, itemCount: purchase.count };
     const nearby = matchNearby.single(line);
     if (nearby) return { ...row, include: false, flag: 'duplicate', duplicateOf: { description: nearby.description, date: nearby.date } };
+    const near = matchNearby.nearPurchase(line);
+    if (near) {
+      return { ...row, suggestion: { purchase: near.id, itemCount: near.count, total: near.amount, merchant: near.merchant || '', diff: round2(line.amount - near.amount) } };
+    }
     return row;
   });
 
@@ -168,6 +178,7 @@ const preview = async (userId, file) => {
       settlements: rows.filter((r) => r.flag === 'settlement').length,
       cashWithdrawals: rows.filter((r) => r.flag === 'cash').length,
       linkedPurchases: rows.filter((r) => r.flag === 'items').length,
+      suggestedPurchases: rows.filter((r) => r.suggestion).length,
       duplicates: rows.filter((r) => r.flag === 'duplicate').length,
     },
   };
@@ -193,9 +204,34 @@ const accountsForRows = async (userId, rows) => {
 const linkToPurchase = async (userId, row, accountId) => {
   const items = await transactionRepository.findPurchase(userId, row.purchase);
   const total = round2(items.reduce((s, t) => s + t.amount, 0));
-  if (!items.length || total !== row.amount || items.some((t) => t.importHash)) return false;
+  const fits = row.adjust ? items.length && isClose(total, row.amount) : total === row.amount;
+  if (!items.length || !fits || items.some((t) => t.importHash)) return false;
+  const fit = fitToCharge(items.map((t) => t.amount), row.amount);
+  if (!fit) return false;
   const known = await transactionRepository.existingImportHashes(userId, [row.importHash]);
   if (known.size) return false;
+
+  // The card charged a little more or less than the items: even them out to the charge
+  if (fit.reduce) {
+    const item = items[fit.reduce.index];
+    item.set({ amount: fit.reduce.amount, ...(item.productName ? { unitPrice: round2(fit.reduce.amount / item.quantity) } : {}) });
+    await item.save();
+  }
+  if (fit.add > 0) {
+    const largest = items.reduce((a, b) => (b.amount > a.amount ? b : a));
+    const [first] = items;
+    await transactionRepository.create(userId, {
+      type: 'expense',
+      amount: fit.add,
+      category: largest.category,
+      description: ADJUSTMENT_NAME,
+      merchant: first.merchant,
+      date: first.date,
+      purchase: row.purchase,
+      source: first.source,
+      ...(first.receipt ? { receipt: first.receipt } : {}),
+    });
+  }
   const charge = await accountManager.resolveCharge(userId, accountId, row.date, row.chargeDate);
   await transactionRepository.linkPurchase(userId, row.purchase, items[0]._id, { ...charge, importHash: row.importHash });
   return true;

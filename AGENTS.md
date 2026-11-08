@@ -17,7 +17,8 @@ SmartHome is a household finance app: a React + Vite frontend (`frontend/`) and 
 - `backend/src/services/statement.service.js` + `managers/import.manager.js`: bank and card statement import. Every line has an `importHash`; lines that would count money twice start switched off.
 - `backend/src/utils/sheetSync.js` (the comparison logic) + `managers/sheets.manager.js`: Google Sheets sync. Removing a row in the sheet never deletes from the app.
 - `Account` (card / checking / cash) is what `Transaction.account` and `RecurringPayment.account` point to. `Transaction.isRefund` is income in the books but excluded from maaser.
-- `Transaction.purchase`: items bought together are separate transactions sharing this id, so reports work unchanged. A statement line equal to their total links to them instead of counting again; one item holds its `importHash`, and passes it on when deleted.
+- `Transaction.purchase`: items bought together are separate transactions sharing this id, so reports work unchanged. A statement line equal to their total links to them instead of counting again; one item holds its `importHash`, and passes it on when deleted. Items saved after the statement replace its line (`payment`). Matching rules (3 days, 5% tolerance, same store first) live in `utils/purchaseMatch.js`; a close amount is only ever offered, never linked on its own.
+- `SmartHome.exe` (source `launcher/SmartHome.cs`, built by `launcher/build.ps1`): the double-click local start. It sets `HOST=127.0.0.1`, `PORT=5180`, `FRONTEND_DIR` and `STOP_WITH_LAUNCHER`; the server stops cleanly when its stdin closes. Rebuild and commit the exe whenever the source changes.
 - Root `Dockerfile` + `render.yaml`: one container where the API also serves the built frontend (`FRONTEND_DIR`).
 - `frontend/public/sw.js`: caches only the app's own files. It must never cache `/api`.
 

@@ -19,6 +19,8 @@ const commit = Joi.object({
         standing: Joi.boolean(),
         importHash: Joi.string().hex().length(64).required(),
         purchase: objectId().allow(null),
+        // The items' total is only close to this line: they are evened out to it
+        adjust: Joi.boolean(),
       })
     )
     .min(1)

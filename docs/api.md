@@ -103,8 +103,16 @@
 | GET | `/transactions/import/template` | הורדת קובץ תבנית ליבוא |
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
 | POST | `/transactions/bulk` | יצירה גורפת: `rows[]` (עד 1000) |
-| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, account?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת, והם חולקים `purchase`. שורה בדף שסכומה שווה לסל, עד 3 ימים מתאריכו, מקושרת אליו ולא נספרת שוב |
+| POST | `/transactions/basket` | קנייה אחת עם כמה מוצרים: `merchant?, date, notes?, account?, payment?, items[]` (`name, quantity?, total, category?`, עד 200). כל מוצר נשמר כעסקת הוצאה נפרדת, והם חולקים `purchase`. עם `payment` הפריטים מחליפים את שורת הדף הזו (ראו למטה) |
 | POST | `/transactions/:id/split` | מפצל הוצאה לפריטים: `items[]` (לפחות 2). הסכום חייב להיות שווה לעסקה (אחרת 400), והכרטיס ומועד החיוב נשמרים |
+| GET | `/transactions/:id/purchase` | כל הפריטים של הקנייה שהעסקה שייכת אליה: `merchant, date, account, chargeDate, total, matched, items[]`. `matched` אומר אם שורת הדף קושרה אליהם |
+| GET | `/transactions/payment-candidates?date=&total=&merchant=` | עד 5 שורות מדף שיובא, שקנייה שנשמרת עכשיו עשויה להיות: הוצאה עם `importHash`, עד 3 ימים מהתאריך, ובהפרש של עד 5% (לפחות 2 ₪). סכום זהה קודם, אחר כך אותו בית עסק, אחר כך התאריך הקרוב. בכל אחת `diff` (החיוב פחות הקנייה) ו‑`sameMerchant` |
+
+**קנייה מול שורה בדף.** אותו כסף לא נספר פעמיים, בשני הכיוונים:
+- **הפריטים נרשמו קודם:** שורה בדף שסכומה שווה לפריטים, עד 3 ימים מתאריכם, מקושרת אליהם (`flag: items`). אם כמה קניות מתאימות, מועדפת זו מאותו בית עסק. שורה שרק קרובה בסכום מקבלת `suggestion` ונשארת שורה רגילה, עד שהמשתמש בוחר לקשר (`purchase` + `adjust: true` ב‑commit).
+- **הדף יובא קודם:** `payment` ב‑`/transactions/basket` או ב‑`/receipts/:id/confirm` הופך את השורה לפריט הראשון, כך שטביעת הדף, הכרטיס ומועד החיוב נשמרים. המסך מציע אותה דרך `payment-candidates`, וסכום זהה נבחר מראש.
+- **הפרש קטן:** חיוב גבוה מהפריטים מוסיף פריט "הפרש מול החיוב בכרטיס". חיוב נמוך יותר (בדרך כלל הנחה) יורד מהפריט היקר. שורה שכבר קושרה, או הפרש גדול מהמותר, מחזירים 409.
+- **קבלה עם מוצר אחד** היא גם קנייה (`purchase`), כדי ששורת הדף תמצא אותה.
 
 ## כרטיסים וחשבונות – `/api/accounts`
 
@@ -122,7 +130,7 @@
 | שיטה | נתיב | תיאור |
 |---|---|---|
 | POST | `/imports/statement/preview` | העלאת `.xlsx`, `.xls`, `.csv` או `.html` (שדה `file`). לא שומר דבר. מחזיר `kind, rows[], newCards[], summary` |
-| POST | `/imports/statement/commit` | שמירה: `rows[]` (עד 2000) ו‑`account?`. מחזיר `{ created, skipped }` |
+| POST | `/imports/statement/commit` | שמירה: `rows[]` (עד 2000) ו‑`account?`. מחזיר `{ created, linked, skipped }` |
 
 בכל שורה: `include` קובע אם היא מסומנת כברירת מחדל, ו‑`flag` מסביר למה לא: `imported` (כבר יובאה), `settlement` (חיוב כרטיס בעו"ש) או `duplicate` (נראה שכבר נרשמה ידנית או כהוראת קבע). זיכוי בכרטיס נשמר עם `isRefund`: נספר כהכנסה בדוחות, אך לא בחישוב המעשר.
 
@@ -192,7 +200,7 @@
 |---|---|---|
 | GET | `/receipts?page=&limit=` | הקבלות, מהחדשה לישנה, עם הקטגוריה של כל מוצר. `meta.pagination` כמו בעסקאות (ברירת מחדל 20 לעמוד) |
 | POST | `/receipts/scan` | העלאת תמונה / PDF (שדה `file`), פענוח ב‑Gemini, מחזיר שורות מוצר לבדיקה |
-| POST | `/receipts/:id/confirm` | `merchant, date, items[]` – כל פריט נשמר כעסקה נפרדת |
+| POST | `/receipts/:id/confirm` | `merchant, date, items[], payment?` – כל פריט נשמר כעסקה נפרדת. עם `payment` הפריטים מחליפים שורה מדף שיובא. מחזיר `created, linked, adjusted` |
 | GET | `/receipts/:id/file` | הקובץ המקורי (לבעלים בלבד) |
 | DELETE | `/receipts/:id` | מחיקה |
 

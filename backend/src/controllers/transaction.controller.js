@@ -46,4 +46,22 @@ const createBasket = asyncHandler(async (req, res) => created(res, await transac
 
 const split = asyncHandler(async (req, res) => ok(res, await transactionManager.split(req.user.id, req.params.id, req.body)));
 
-module.exports = { list, getById, create, update, remove, split, exportExcel, importTemplate, importPreview, bulkCreate, createBasket };
+const purchase = asyncHandler(async (req, res) => ok(res, await transactionManager.getPurchase(req.user.id, req.params.id)));
+
+const paymentCandidates = asyncHandler(async (req, res) => ok(res, await transactionManager.paymentCandidates(req.user.id, req.query)));
+
+module.exports = {
+  list,
+  getById,
+  create,
+  update,
+  remove,
+  split,
+  purchase,
+  paymentCandidates,
+  exportExcel,
+  importTemplate,
+  importPreview,
+  bulkCreate,
+  createBasket,
+};
