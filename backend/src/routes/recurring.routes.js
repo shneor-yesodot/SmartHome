@@ -7,7 +7,7 @@ const validate = require('../middleware/validate');
 const router = Router();
 
 router.route('/').get(controller.list).post(validate(schema.create), controller.create);
-router.post('/:id/run', validate(idParam, 'params'), controller.runNow);
+router.post('/:id/run', validate(idParam, 'params'), validate(schema.run), controller.runNow);
 
 router
   .route('/:id')

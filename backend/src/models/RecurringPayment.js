@@ -14,6 +14,9 @@ const recurringPaymentSchema = new Schema(
     account: { type: Schema.Types.ObjectId, ref: 'Account' },
     frequency: { type: String, enum: FREQUENCIES, default: 'monthly' },
     nextRun: { type: Date, required: true },
+    // The day of the month it falls on (from the start date): a short month moves one
+    // occurrence earlier, not every occurrence after it
+    dayOfMonth: { type: Number, min: 1, max: 31 },
     lastRun: Date,
     isActive: { type: Boolean, default: true },
   },

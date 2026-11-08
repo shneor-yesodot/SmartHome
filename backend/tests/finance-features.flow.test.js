@@ -219,11 +219,118 @@ describe('purchases made of items', () => {
     expect(preview.body.data.rows[0]).toMatchObject({ flag: 'items', purchase: pizza.purchase });
   });
 
+  it('a linked purchase keeps adding up to the card charge when its items change', async () => {
+    await importLines(['05/03/2026', 'חנות הכלים', '3333', 100, '10/04/2026']);
+    const [line] = (await call('/transactions/payment-candidates?date=2026-03-05&total=100')).body.data;
+    await call('/transactions/basket', { method: 'POST', body: { date: '2026-03-05', payment: line.id, items: [{ name: 'פטיש', total: 60 }, { name: 'מסמרים', total: 40 }] } });
+    const items = async () => (await call('/transactions?from=2026-03-05&to=2026-03-05&limit=100')).body.data.filter((t) => t.purchase);
+    const byName = async (name) => (await items()).find((t) => t.description === name);
+    const total = async () => (await items()).reduce((s, t) => s + t.amount, 0);
+
+    expect((await call(`/transactions/${(await byName('פטיש')).id}`, { method: 'PUT', body: { amount: 61 } })).status).toBe(400);
+    expect((await call(`/transactions/${(await byName('פטיש')).id}`, { method: 'PUT', body: { amount: 55 } })).status).toBe(200);
+    expect((await byName('הפרש מול החיוב בכרטיס')).amount).toBe(5);
+    expect(await total()).toBeCloseTo(100);
+
+    const adjustment = await byName('הפרש מול החיוב בכרטיס');
+    expect((await call(`/transactions/${adjustment.id}`, { method: 'PUT', body: { amount: 1 } })).status).toBe(409);
+    expect((await call(`/transactions/${adjustment.id}`, { method: 'DELETE' })).status).toBe(409);
+    expect((await call(`/transactions/${(await byName('פטיש')).id}`, { method: 'PUT', body: { type: 'income' } })).status).toBe(409);
+
+    // Back to the full price: the difference line is no longer needed
+    await call(`/transactions/${(await byName('פטיש')).id}`, { method: 'PUT', body: { amount: 60 } });
+    expect(await byName('הפרש מול החיוב בכרטיס')).toBeUndefined();
+
+    // Deleting an item: the card still charged it
+    expect((await call(`/transactions/${(await byName('מסמרים')).id}`, { method: 'DELETE' })).status).toBe(204);
+    expect((await byName('הפרש מול החיוב בכרטיס')).amount).toBe(40);
+    expect(await total()).toBeCloseTo(100);
+    expect((await uploadForm('/imports/statement/preview', [cardHeader, ['05/03/2026', 'חנות הכלים', '3333', 100, '10/04/2026']])).body.data.rows[0].flag).toBe('imported');
+
+    // Deleting every item removes the purchase, and the line can be imported again
+    for (const t of await items()) {
+      if (t.description !== 'הפרש מול החיוב בכרטיס') expect((await call(`/transactions/${t.id}`, { method: 'DELETE' })).status).toBe(204);
+    }
+    expect((await call(`/transactions/${(await byName('הפרש מול החיוב בכרטיס')).id}`, { method: 'DELETE' })).status).toBe(204);
+    expect(await items()).toHaveLength(0);
+  });
+
+  it('the same receipt saved twice at once is saved once', async () => {
+    const receipt = await scannedReceipt();
+    const body = { merchant: 'כפול', date: '2026-03-29', items: [{ name: 'סוללות', total: 20 }] };
+    const results = await Promise.all([1, 2].map(() => call(`/receipts/${receipt.id}/confirm`, { method: 'POST', body })));
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await itemsNamed('סוללות')).toHaveLength(1);
+  });
+
+  it('a receipt whose items fail to save can be saved again', async () => {
+    const receipt = await scannedReceipt();
+    // A card line that was already broken into items: refused, after nothing was saved
+    const linkedLine = (await itemsNamed('גבינה'))[0];
+    const failed = await call(`/receipts/${receipt.id}/confirm`, { method: 'POST', body: { date: '2026-03-15', payment: linkedLine.id, items: [{ name: 'x', total: 150 }] } });
+    expect(failed.status).toBe(409);
+    const saved = await call(`/receipts/${receipt.id}/confirm`, { method: 'POST', body: { date: '2026-03-30', items: [{ name: 'מחברת', total: 12 }] } });
+    expect(saved.status).toBe(201);
+  });
+
   it('a receipt of one product is still found by its card line', async () => {
     const receipt = await scannedReceipt();
     await call(`/receipts/${receipt.id}/confirm`, { method: 'POST', body: { merchant: 'אלקטרו בית', date: '2026-03-27', items: [{ name: 'מטען', total: 89.9 }] } });
     const preview = await uploadForm('/imports/statement/preview', [cardHeader, ['28/03/2026', 'אלקטרו בית', '3333', 89.9, '10/04/2026']]);
     expect(preview.body.data.rows[0]).toMatchObject({ flag: 'items', itemCount: 1 });
+  });
+});
+
+describe('standing orders', () => {
+  const recurringManager = require('../src/managers/recurring.manager');
+  const { startOfDay, addFrequency } = require('../src/utils/dateUtils');
+  const day = (d) => new Date(d).toISOString().slice(0, 10);
+  const daysAgo = (n) => day(new Date(Date.now() - n * 86400000));
+  const create = async (description, startDate) =>
+    (await call('/recurring', { method: 'POST', body: { description, amount: 50, category: categoryId('דיור וחשבונות'), startDate, frequency: 'monthly' } })).body.data;
+  const occurrences = async (description) => (await call(`/transactions?search=${encodeURIComponent(description)}&limit=100`)).body.data;
+
+  it('resuming after a pause continues from today, without paying the paused months', async () => {
+    const payment = await create('ועד הבית', daysAgo(100));
+    await call(`/recurring/${payment.id}`, { method: 'PUT', body: { isActive: false } });
+    const resumed = (await call(`/recurring/${payment.id}`, { method: 'PUT', body: { isActive: true } })).body.data;
+    expect(new Date(resumed.nextRun) >= startOfDay()).toBe(true);
+    const wanted = new Date(payment.nextRun).getUTCDate();
+    const next = new Date(resumed.nextRun);
+    const lastOfMonth = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+    expect(next.getUTCDate()).toBe(Math.min(wanted, lastOfMonth));
+    await recurringManager.processDue();
+    const made = await occurrences('ועד הבית');
+    expect(made.length).toBeLessThanOrEqual(1);
+    made.forEach((t) => expect(new Date(t.date) >= startOfDay()).toBe(true));
+  });
+
+  it('"run now" when overdue keeps the day of the month', async () => {
+    const payment = await create('גז', daysAgo(5));
+    const res = await call(`/recurring/${payment.id}/run`, { method: 'POST', body: { nextRun: payment.nextRun } });
+    expect(res.status).toBe(201);
+    expect(day(res.body.data.payment.nextRun)).toBe(day(addFrequency(payment.nextRun, 'monthly')));
+  });
+
+  it('"run now" and the job at the same moment record the occurrence once', async () => {
+    const payment = await create('אינטרנט', daysAgo(1));
+    await Promise.all([call(`/recurring/${payment.id}/run`, { method: 'POST', body: { nextRun: payment.nextRun } }), recurringManager.processDue()]);
+    expect(await occurrences('אינטרנט')).toHaveLength(1);
+  });
+
+  it('a double tap on "run now" pays once', async () => {
+    const payment = await create('חשמל', day(new Date(Date.now() + 10 * 86400000)));
+    const tap = () => call(`/recurring/${payment.id}/run`, { method: 'POST', body: { nextRun: payment.nextRun } });
+    expect((await tap()).status).toBe(201);
+    expect((await tap()).status).toBe(409);
+    expect(await occurrences('חשמל')).toHaveLength(1);
+  });
+
+  it('a payment on the 31st goes back to the 31st after a short month', () => {
+    const payment = { frequency: 'monthly', dayOfMonth: 31 };
+    const feb = addFrequency(new Date('2026-01-31T00:00:00Z'), 'monthly', payment.dayOfMonth);
+    expect(day(feb)).toBe('2026-02-28');
+    expect(day(addFrequency(feb, 'monthly', payment.dayOfMonth))).toBe('2026-03-31');
   });
 });
 

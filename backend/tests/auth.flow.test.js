@@ -100,6 +100,28 @@ describe('registration with e-mail verification', () => {
     expect(res.body.data.user.emailVerified).toBe(true);
     expect(res.body.data.user.sessions).toBeUndefined();
   });
+
+  it('a new code does not buy more guesses', async () => {
+    const email = 'guess@example.com';
+    await call('/auth/register', { method: 'POST', body: { name: 'Guess', email, password: PASSWORD } });
+    const wrongFor = (code) => (code === '000000' ? '111111' : '000000');
+    for (let i = 0; i < 4; i += 1) {
+      expect((await call('/auth/verify-email', { method: 'POST', body: { email, code: wrongFor(lastCode()) } })).status).toBe(400);
+    }
+    await call('/auth/resend-code', { method: 'POST', body: { email } });
+    expect((await call('/auth/verify-email', { method: 'POST', body: { email, code: wrongFor(lastCode()) } })).status).toBe(400);
+    // Five wrong codes this hour: even the right one waits
+    const blocked = await call('/auth/verify-email', { method: 'POST', body: { email, code: lastCode() } });
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.message).toMatch(/בעוד שעה/);
+    await call('/auth/resend-code', { method: 'POST', body: { email } });
+    expect((await call('/auth/verify-email', { method: 'POST', body: { email, code: lastCode() } })).status).toBe(400);
+
+    // An hour later the count starts again
+    await mongoose.model('User').updateOne({ email }, { $set: { 'otp.windowStart': new Date(Date.now() - 61 * 60 * 1000) } });
+    await call('/auth/resend-code', { method: 'POST', body: { email } });
+    expect((await call('/auth/verify-email', { method: 'POST', body: { email, code: lastCode() } })).status).toBe(200);
+  });
 });
 
 describe('sessions', () => {

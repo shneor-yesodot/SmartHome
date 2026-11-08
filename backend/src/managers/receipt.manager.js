@@ -66,13 +66,21 @@ const scan = async (userId, file) => {
 const confirm = async (userId, id, { merchant, date, items, payment }) => {
   const receipt = await receiptRepository.findOneByUser(userId, id);
   if (!receipt) throw ApiError.notFound('הקבלה לא נמצאה');
-  if (receipt.status === 'confirmed') throw ApiError.conflict('הקבלה הזו כבר נשמרה כעסקאות');
+  // Claimed in one step, so two tabs (or a double tap) cannot save the same receipt twice
+  if (!(await receiptRepository.claim(userId, id))) throw ApiError.conflict('הקבלה הזו כבר נשמרה כעסקאות');
 
   const rows = transactionManager.itemsToRows({ merchant, date, items }, { group: true });
   const options = { source: 'receipt', extra: { receipt: receipt._id } };
-  // Already on an imported statement: the items take that line's place instead of counting again
-  const linked = payment ? await transactionManager.attachToPayment(userId, payment, rows, options) : null;
-  const created = linked ? linked.created : (await transactionManager.bulkCreate(userId, rows, options)).length;
+  let linked;
+  let created;
+  try {
+    // Already on an imported statement: the items take that line's place instead of counting again
+    linked = payment ? await transactionManager.attachToPayment(userId, payment, rows, options) : null;
+    created = linked ? linked.created : (await transactionManager.bulkCreate(userId, rows, options)).length;
+  } catch (err) {
+    await receiptRepository.release(userId, id);
+    throw err;
+  }
 
   receipt.set({
     merchant,

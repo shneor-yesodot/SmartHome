@@ -34,6 +34,9 @@ const transactionSchema = new Schema(
     isRefund: { type: Boolean, default: false },
     // Fingerprint of an imported statement line, so importing the same file twice adds nothing
     importHash: { type: String, select: false },
+    // A row typed into the Google sheet (spreadsheet, row, values): a sync that failed
+    // before writing the new id back must not create it again on the next try
+    sheetKey: { type: String, select: false },
   },
   baseOptions
 );
@@ -47,5 +50,6 @@ transactionSchema.index(
   { user: 1, importHash: 1 },
   { unique: true, partialFilterExpression: { importHash: { $type: 'string' } } }
 );
+transactionSchema.index({ user: 1, sheetKey: 1 }, { unique: true, partialFilterExpression: { sheetKey: { $type: 'string' } } });
 
 module.exports = model('Transaction', transactionSchema);

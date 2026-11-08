@@ -68,7 +68,7 @@ export default function Recurring() {
                 payment={payment}
                 busy={pending}
                 onToggle={(p) => act(() => recurringService.update(p.id, { isActive: !p.isActive }), p.isActive ? 'ההוראה הושהתה' : 'ההוראה הופעלה')}
-                onRun={(p) => act(() => recurringService.runNow(p.id), `נרשמה עסקה: ${p.description}`)}
+                onRun={(p) => act(() => recurringService.runNow(p.id, p.nextRun), `נרשמה עסקה: ${p.description}`)}
                 onEdit={setEditing}
                 onDelete={setDeleting}
               />

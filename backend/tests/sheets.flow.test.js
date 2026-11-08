@@ -117,6 +117,36 @@ describe('two-way mode', () => {
     expect((await call('/sheets/sync', { method: 'POST' })).body.data).toMatchObject({ created: 0, updated: 0 });
   });
 
+  it('a sync that fails before writing back does not create the new row twice', async () => {
+    const sheetsService = require('../src/services/googleSheets.service');
+    const replace = sheetsService.client.replace;
+    mockTabs[TAB].push(['', '06/10/2026', '', 'הוצאה', '7', 'סופר ומזון', 'גבינה מהגיליון', '', '', '', '']);
+    sheetsService.client.replace = async () => {
+      throw new Error('Google is down');
+    };
+    expect((await call('/sheets/sync', { method: 'POST' })).status).toBe(500);
+    sheetsService.client.replace = replace;
+    expect((await call('/sheets')).body.data.lastError).toBe('Google is down');
+
+    const res = await call('/sheets/sync', { method: 'POST' });
+    expect(res.body.data.created).toBe(0);
+    const copies = (await call('/transactions?limit=100')).body.data.filter((t) => t.description === 'גבינה מהגיליון');
+    expect(copies).toHaveLength(1);
+    expect(rowOf('גבינה מהגיליון')[COL.id]).toBe(copies[0].id);
+  });
+
+  it('two syncs at once: the second is refused instead of interleaving', async () => {
+    const sheetsService = require('../src/services/googleSheets.service');
+    const { read } = sheetsService.client;
+    sheetsService.client.read = async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 300)); // a slow Google, so the two overlap
+      return read(...args);
+    };
+    const results = await Promise.all([call('/sheets/sync', { method: 'POST' }), call('/sheets/sync', { method: 'POST' })]);
+    sheetsService.client.read = read;
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+  });
+
   it('the app wins when both sides changed, and says so', async () => {
     const tx = (await call('/transactions')).body.data.find((t) => t.description === 'קנייה');
     rowOf('קנייה')[COL.amount] = '555';

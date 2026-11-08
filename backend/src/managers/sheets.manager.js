@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const accountRepository = require('../repositories/account.repository');
 const categoryRepository = require('../repositories/category.repository');
 const transactionRepository = require('../repositories/transaction.repository');
@@ -120,8 +121,12 @@ const readPlan = async (user) => {
 /** What a two-way sync would do. Nothing changes on either side. */
 const preview = async (user) => describePlan((await readPlan(user)).plan);
 
+/** The same row of the same sheet with the same values: already created by an earlier try. */
+const sheetKeyOf = (spreadsheetId, row) =>
+  crypto.createHash('sha256').update(JSON.stringify([spreadsheetId, row.rowNumber, row.cells])).digest('hex');
+
 /** Applies edits from the sheet. A row with an unknown category is reported instead of guessed. */
-const applyPlan = async (user, plan) => {
+const applyPlan = async (user, plan, spreadsheetId) => {
   const [categories, accounts] = await Promise.all([categoryRepository.findAllByUser(user.id), accountRepository.findAllByUser(user.id)]);
   const toPayload = ({ fields }) => {
     const category = categories.find((c) => c.name === fields.category && c.type === fields.type);
@@ -151,7 +156,11 @@ const applyPlan = async (user, plan) => {
   };
   let created = 0;
   let updated = 0;
-  for (const row of plan.create) created += await attempt(row, (data) => transactionManager.create(user.id, data));
+  const keyed = plan.create.map((row) => ({ row, sheetKey: sheetKeyOf(spreadsheetId, row) }));
+  const done = await transactionRepository.existingSheetKeys(user.id, keyed.map((k) => k.sheetKey));
+  for (const { row, sheetKey } of keyed) {
+    if (!done.has(sheetKey)) created += await attempt(row, (data) => transactionManager.create(user.id, { ...data, sheetKey }));
+  }
   for (const row of plan.update) updated += await attempt(row, (data) => transactionManager.update(user.id, row.id, data));
   return { created, updated, failed };
 };
@@ -169,7 +178,20 @@ const push = async (user, spreadsheetId, keptRows = []) => {
  * Backup mode: the app overwrites the sheet.
  * Two-way mode: edits from the sheet come in first, then the sheet is rewritten.
  */
+// Users whose sync is running now: the nightly job and the button must not interleave
+const syncing = new Set();
+
 const sync = async (user) => {
+  if (syncing.has(user.id)) throw ApiError.conflict('סנכרון כבר מתבצע. נסו שוב בעוד רגע');
+  syncing.add(user.id);
+  try {
+    return await syncOnce(user);
+  } finally {
+    syncing.delete(user.id);
+  }
+};
+
+const syncOnce = async (user) => {
   const fresh = await userRepository.findById(user.id);
   try {
     const { spreadsheetId, plan } = await readPlan(fresh);
@@ -178,7 +200,7 @@ const sync = async (user) => {
     let keptRows = [];
 
     if (fresh.sheets.mode === 'two-way') {
-      applied = await applyPlan(fresh, plan);
+      applied = await applyPlan(fresh, plan, spreadsheetId);
       const unreadable = [...plan.invalid, ...applied.failed];
       keptRows = unreadable.filter((r) => r.cells).map((r) => r.cells);
       report = { conflicts: plan.conflicts, restored: plan.restored, invalid: unreadable.map(({ rowNumber, error }) => ({ rowNumber, error })) };

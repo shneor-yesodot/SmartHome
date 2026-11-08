@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link2 } from 'lucide-react';
 import { transactionService } from '../../services/transaction.service';
 import { formatDate, formatMoney } from '../../utils/format';
@@ -38,13 +38,20 @@ export default function PaymentMatch({ date, total, merchant, value, onChange })
     };
   }, [date, amount, merchant]);
 
-  // A new list: keep the choice when it is still there, otherwise take an exact match
+  // A new list: keep the choice when it is still there. An exact match is taken only until
+  // the user chooses for themselves, "don't link" included.
+  const chosenByUser = useRef(false);
   useEffect(() => {
     if (candidates.some((c) => c.id === value)) return;
-    const exact = candidates.find((c) => c.diff === 0);
+    if (chosenByUser.current && !value) return;
+    const exact = !chosenByUser.current && candidates.find((c) => c.diff === 0);
     onChange(exact ? exact.id : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidates]);
+  const choose = (id) => {
+    chosenByUser.current = true;
+    onChange(id);
+  };
 
   if (!candidates.length) return null;
 
@@ -57,7 +64,7 @@ export default function PaymentMatch({ date, total, merchant, value, onChange })
       <p className="text-xs text-ink-soft">אם כן, הפריטים יחליפו את שורת החיוב, וההוצאה תיספר פעם אחת.</p>
       {candidates.map((c) => (
         <label key={c.id} className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-white px-3 py-2 text-sm">
-          <input type="radio" name="payment" className="mt-1 h-4 w-4 accent-brand-500" checked={value === c.id} onChange={() => onChange(c.id)} />
+          <input type="radio" name="payment" className="mt-1 h-4 w-4 accent-brand-500" checked={value === c.id} onChange={() => choose(c.id)} />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline justify-between gap-x-3">
               <span className="truncate font-medium">{c.description}</span>
@@ -73,7 +80,7 @@ export default function PaymentMatch({ date, total, merchant, value, onChange })
         </label>
       ))}
       <label className="flex cursor-pointer items-start gap-2.5 px-3 py-1 text-sm">
-        <input type="radio" name="payment" className="mt-1 h-4 w-4 accent-brand-500" checked={!value} onChange={() => onChange(null)} />
+        <input type="radio" name="payment" className="mt-1 h-4 w-4 accent-brand-500" checked={!value} onChange={() => choose(null)} />
         <span>
           זו קנייה אחרת, לשמור בלי לקשר
           <span className="block text-xs text-ink-muted">אם זה בכל זאת אותו חיוב, ההוצאה תיספר פעמיים</span>

@@ -45,8 +45,8 @@
 | POST | `/auth/register` | הרשמה ויצירת קטגוריות ברירת מחדל. מחזיר סשן או `verificationRequired` | `name, email, password` |
 | POST | `/auth/login` | התחברות. מחזיר סשן, `verificationRequired` או `twoFactorRequired` | `email, password` |
 | POST | `/auth/login/2fa` | סיום ההתחברות עם קוד מהאפליקציה או קוד גיבוי. מחזיר סשן | `challenge, code` |
-| POST | `/auth/verify-email` | אימות הקוד (6 ספרות, 10 דקות, עד 5 ניסיונות). מחזיר סשן | `email, code` |
-| POST | `/auth/resend-code` | שליחת קוד חדש. התשובה זהה בכל מקרה | `email` |
+| POST | `/auth/verify-email` | אימות הקוד (6 ספרות, 10 דקות). עד 5 קודים שגויים בשעה, גם אם נשלחו כמה קודים. מחזיר סשן | `email, code` |
+| POST | `/auth/resend-code` | שליחת קוד חדש. התשובה זהה בכל מקרה, וקוד חדש לא מאפס את מניין הטעויות של השעה | `email` |
 | POST | `/auth/forgot-password` | שליחת קישור איפוס (תקף שעה). התשובה זהה בכל מקרה | `email` |
 | POST | `/auth/reset-password` | סיסמה חדשה: מבטל את כל הסשנים ומחזיר סשן חדש או `twoFactorRequired` | `token, password` |
 | POST | `/auth/refresh` | טוקן חדש ועוגייה חדשה | – (העוגייה) |
@@ -97,8 +97,8 @@
 | GET | `/transactions` | רשימה עם סינון ודפדוף. פרמטרים: `page, limit, type, category, account, chargeDate, source, from, to, search` |
 | POST | `/transactions` | יצירה: `type, amount, category, description, date, merchant?, notes?, productName?, quantity?, account?, chargeDate?`. בכרטיס עם יום חיוב, `chargeDate` מחושב אם לא נשלח |
 | GET | `/transactions/:id` | עסקה בודדת |
-| PUT | `/transactions/:id` | עדכון |
-| DELETE | `/transactions/:id` | מחיקה |
+| PUT | `/transactions/:id` | עדכון. בפריט מקנייה שקושרה לחיוב בכרטיס, שינוי סכום עובר לשורת "הפרש מול החיוב בכרטיס" כך שהסכום הכולל נשאר החיוב (400 אם הפריטים יעלו עליו). את שורת ההפרש עצמה, או סוג הפריט, אי אפשר לשנות (409) |
+| DELETE | `/transactions/:id` | מחיקה. בקנייה שקושרה לחיוב, סכום הפריט שנמחק עובר לשורת ההפרש. שורת ההפרש נמחקת רק כשהיא אחרונה (409 לפני כן) |
 | GET | `/transactions/export` | הורדת קובץ Excel לפי אותם פרמטרי סינון |
 | GET | `/transactions/import/template` | הורדת קובץ תבנית ליבוא |
 | POST | `/transactions/import/preview` | העלאת `.xlsx` / `.csv` (שדה `file`), מחזיר שורות מנותחות לתצוגה מקדימה |
@@ -143,7 +143,7 @@
 | PATCH | `/sheets` | שינוי `mode` או `autoSync` |
 | DELETE | `/sheets` | ניתוק. הגיליון עצמו נשאר |
 | GET | `/sheets/preview` | מה סנכרון דו‑כיווני היה עושה, בלי לשנות דבר |
-| POST | `/sheets/sync` | סנכרון עכשיו. מחזיר `pushed, created, updated, conflicts, restored, invalid` |
+| POST | `/sheets/sync` | סנכרון עכשיו. מחזיר `pushed, created, updated, conflicts, restored, invalid`. 409 אם סנכרון אחר של אותו משתמש רץ. שורה חדשה מהגיליון נזכרת לפי הגיליון, מספר השורה והתוכן שלה, כך שסנכרון שנכשל לפני שהמזהים נכתבו לגיליון לא יוצר אותה שוב |
 
 ## קטגוריות – `/api/categories`
 
@@ -185,7 +185,9 @@
 | POST | `/recurring` | `description, amount, category, startDate, type?, frequency?, merchant?` |
 | PUT | `/recurring/:id` | עדכון, כולל `isActive` להשהיה |
 | DELETE | `/recurring/:id` | מחיקה |
-| POST | `/recurring/:id/run` | ביצוע מיידי: יוצר עסקה ומקדם את התאריך הבא |
+| POST | `/recurring/:id/run` | ביצוע מיידי: יוצר עסקה ומקדם את התאריך הבא. `nextRun?`: התאריך שהמסך הציג. אם הוא השתנה בינתיים (המשימה המתוזמנת רצה, או לחיצה כפולה), מוחזר 409 ולא נרשם כלום. לפני מועד החיוב זה תשלום מוקדם של התקופה; באיחור התאריך הבא שומר על היום בחודש |
+
+**הוראת קבע:** היום בחודש נשמר (`dayOfMonth`), כך שחיוב ב‑31 עובר ל‑28 בפברואר וחוזר ל‑31 במרץ. חידוש אחרי השהיה ממשיך מהיום והלאה, בלי לרשום את התקופות שהושהו. שינוי `startDate` לתאריך עבר כן רושם את התקופות שמאז, כי זו בחירה מפורשת.
 
 ## מוצרים – `/api/products`
 
