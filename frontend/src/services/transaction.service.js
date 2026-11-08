@@ -15,4 +15,12 @@ export const transactionService = {
     return unwrap(api.post('/transactions/import/preview', form));
   },
   bulkCreate: (rows) => unwrap(api.post('/transactions/bulk', { rows })),
+  /** One purchase with several products: { merchant, date, notes?, items: [{ name, quantity, total, category }] } */
+  createBasket: (data) => unwrap(api.post('/transactions/basket', data)),
+  /** Breaks a transaction into items whose total equals it: [{ name, quantity, total, category }] */
+  split: (id, items) => unwrap(api.post(`/transactions/${id}/split`, { items })),
+  /** Every item bought together with this one, and what paid for them */
+  purchase: (id) => unwrap(api.get(`/transactions/${id}/purchase`)),
+  /** Imported statement lines a purchase being saved may be: { date, total, merchant } */
+  paymentCandidates: (params) => unwrap(api.get('/transactions/payment-candidates', { params: cleanParams(params) })),
 };

@@ -13,6 +13,7 @@ export default function RecurringRow({ payment, busy, onToggle, onRun, onEdit, o
         <p className="text-sm text-ink-muted">
           {FREQUENCY_LABELS[payment.frequency]}, {payment.category?.name}
           {payment.merchant ? `, ${payment.merchant}` : ''}
+          {payment.account ? `, ${payment.account.name}` : ''}
         </p>
       </div>
       <div className="min-w-[110px]">

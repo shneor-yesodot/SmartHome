@@ -2,7 +2,14 @@ export const TYPE_LABELS = { income: 'הכנסה', expense: 'הוצאה' };
 
 export const FREQUENCY_LABELS = { daily: 'יומי', weekly: 'שבועי', monthly: 'חודשי', yearly: 'שנתי' };
 
-export const SOURCE_LABELS = { manual: 'ידני', receipt: 'קבלה', import: 'יבוא Excel', recurring: 'הוראת קבע' };
+export const SOURCE_LABELS = { manual: 'ידני', receipt: 'קבלה', import: 'יבוא', recurring: 'הוראת קבע' };
+
+export const ACCOUNT_KIND_LABELS = { credit: 'כרטיס אשראי', bank: 'חשבון עו״ש', cash: 'מזומן' };
+
+export const CALENDAR_OPTIONS = [
+  { value: 'gregorian', label: 'לועזי' },
+  { value: 'hebrew', label: 'עברי' },
+];
 
 export const COLORS = ['#12A05C', '#2F7FD1', '#E08A1E', '#D9508A', '#D93F3F', '#7B61D9', '#1FA6A6', '#5C6BC0', '#7C8B83'];
 
@@ -13,7 +20,12 @@ export const GOAL_STATUS = {
   on_track: { label: 'בדרך הנכונה', tone: 'success' },
   behind: { label: 'מפגר מהיעד', tone: 'warning' },
   overdue: { label: 'התאריך עבר', tone: 'danger' },
+  at_risk: { label: 'בסיכון החודש', tone: 'warning' },
 };
+
+/** "On track" so far, but this month's expenses leave too little for the goal */
+export const goalStatus = (progress) =>
+  GOAL_STATUS[progress.status === 'on_track' && progress.affordable === false ? 'at_risk' : progress.status];
 
 export const BUDGET_STATUS = {
   ok: { label: 'בתוך התקציב', tone: 'success' },

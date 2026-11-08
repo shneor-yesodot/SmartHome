@@ -22,7 +22,7 @@ function FormBody({ goal, onClose, onSaved }) {
     targetAmount: goal?.targetAmount ?? '',
     initialAmount: '',
     targetDate: goal ? toInputDate(goal.targetDate) : '',
-    icon: goal?.icon || 'PiggyBank',
+    icon: (goal?.icon === 'PiggyBank' ? 'Coins' : goal?.icon) || 'Coins',
     color: goal?.color || '#12A05C',
   });
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pencil, Plus, Tags, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { FileUp, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import Card from '../ui/Card';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -22,10 +22,26 @@ export default function CategoryManager() {
   const { run, pending } = useAction();
   const [editing, setEditing] = useState(undefined);
   const [deleting, setDeleting] = useState(null);
+  const [importing, setImporting] = useState(null);
+  const fileRef = useRef(null);
 
   const confirmDelete = async () => {
     const { ok } = await run(() => categoryService.remove(deleting.id), 'הקטגוריה נמחקה');
     setDeleting(null);
+    if (ok) reload();
+  };
+
+  const chooseFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const { ok, result } = await run(() => categoryService.previewImport(file));
+    if (ok) setImporting(result);
+  };
+
+  const confirmImport = async () => {
+    const { ok } = await run(() => categoryService.importNames({ expense: importing.expense, income: importing.income }), 'הקטגוריות יובאו');
+    setImporting(null);
     if (ok) reload();
   };
 
@@ -34,9 +50,15 @@ export default function CategoryManager() {
       title="קטגוריות"
       icon={Tags}
       action={
-        <Button size="sm" icon={Plus} onClick={() => setEditing(null)}>
-          קטגוריה חדשה
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden aria-label="קובץ סיכום חודשי" onChange={chooseFile} />
+          <Button size="sm" variant="secondary" icon={FileUp} loading={pending && !importing && !deleting} onClick={() => fileRef.current.click()}>
+            יבוא מקובץ סיכום
+          </Button>
+          <Button size="sm" icon={Plus} onClick={() => setEditing(null)}>
+            קטגוריה חדשה
+          </Button>
+        </div>
       }
     >
       <div className="grid gap-6 md:grid-cols-2">
@@ -69,6 +91,38 @@ export default function CategoryManager() {
             onClose={() => setEditing(undefined)}
             onSaved={reload}
           />
+        )}
+      </Modal>
+      <Modal
+        open={Boolean(importing)}
+        onClose={() => setImporting(null)}
+        title="יבוא קטגוריות"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setImporting(null)}>
+              ביטול
+            </Button>
+            <Button loading={pending} disabled={!importing?.expense.length && !importing?.income.length} onClick={confirmImport}>
+              יבוא
+            </Button>
+          </>
+        }
+      >
+        {importing && (
+          <div className="space-y-3 text-sm">
+            <p>
+              <b>הוצאות ({importing.expense.length}):</b> {importing.expense.join(', ') || 'אין חדשות'}
+            </p>
+            <p>
+              <b>הכנסות ({importing.income.length}):</b> {importing.income.join(', ') || 'אין חדשות'}
+            </p>
+            {importing.removed.length > 0 && (
+              <p className="text-ink-soft">
+                <b>יוסרו ברירות מחדל שלא בשימוש:</b> {importing.removed.join(', ')}
+              </p>
+            )}
+            <p className="text-ink-muted">קטגוריות עם עסקאות, תקציב או הוראת קבע לא יימחקו. מעקב המעשר נשמר.</p>
+          </div>
         )}
       </Modal>
       <ConfirmDialog

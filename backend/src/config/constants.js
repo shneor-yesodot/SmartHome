@@ -4,6 +4,8 @@ const TRANSACTION_TYPES = Object.freeze(['income', 'expense']);
 const TRANSACTION_SOURCES = Object.freeze(['manual', 'receipt', 'import', 'recurring']);
 const FREQUENCIES = Object.freeze(['daily', 'weekly', 'monthly', 'yearly']);
 const USER_ROLES = Object.freeze(['user', 'admin']);
+// Months can be counted by the Gregorian or by the Hebrew calendar
+const CALENDARS = Object.freeze(['gregorian', 'hebrew']);
 
 // Weights of the financial health score (must sum to 1)
 const HEALTH_WEIGHTS = Object.freeze({ savings: 0.4, budget: 0.3, trend: 0.3 });
@@ -14,13 +16,27 @@ const RECEIPT_MIME_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp
 
 const FALLBACK_CATEGORY_NAME = 'אחר';
 
+// Maaser (tithe): a share of the income, or a fixed amount every month
+const MAASER_MODES = Object.freeze(['percent', 'fixed']);
+const MAASER_CATEGORY_NAME = 'צדקה ומעשרות';
+
+// Where money moves through: a bank (checking) account, a credit card or cash
+const ACCOUNT_KINDS = Object.freeze(['bank', 'credit', 'cash']);
+// Google Sheets: the sheet only mirrors the app, or edits in it come back to the app
+const SHEET_SYNC_MODES = Object.freeze(['backup', 'two-way']);
+
 module.exports = {
   TRANSACTION_TYPES,
   TRANSACTION_SOURCES,
   FREQUENCIES,
   USER_ROLES,
+  CALENDARS,
   HEALTH_WEIGHTS,
   TARGET_SAVINGS_RATE,
   RECEIPT_MIME_TYPES,
   FALLBACK_CATEGORY_NAME,
+  MAASER_MODES,
+  MAASER_CATEGORY_NAME,
+  ACCOUNT_KINDS,
+  SHEET_SYNC_MODES,
 };

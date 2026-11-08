@@ -7,19 +7,12 @@ const safePath = (value) =>
   value && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') ? value : '/';
 
 /**
- * Landing page after Google sign-in. The server puts the tokens in the URL
- * fragment (never sent to any server); we store them and reload into the app.
+ * Landing page after Google sign-in. The server already set the session cookie;
+ * reloading into the app makes it fetch an access token with that cookie.
  */
 export default function OAuthCallback() {
   useEffect(() => {
-    const fragment = new URLSearchParams(window.location.hash.slice(1));
-    const token = fragment.get('token');
-    const refreshToken = fragment.get('refreshToken');
-    if (!token || !refreshToken) {
-      window.location.replace('/login?error=google');
-      return;
-    }
-    tokenStore.set({ token, refreshToken });
+    tokenStore.set({ token: null });
     const returnTo = new URLSearchParams(window.location.search).get('returnTo');
     window.location.replace(safePath(returnTo));
   }, []);

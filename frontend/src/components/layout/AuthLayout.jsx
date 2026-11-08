@@ -1,10 +1,10 @@
-import { PiggyBank, ScanLine, Target } from 'lucide-react';
+import { Coins, ScanLine, Target } from 'lucide-react';
 import Logo from './Logo';
 
 const HIGHLIGHTS = [
   { icon: ScanLine, text: 'מצלמים קבלה, וכל מוצר נרשם כעסקה' },
   { icon: Target, text: 'תקציב לכל קטגוריה והתראה לפני חריגה' },
-  { icon: PiggyBank, text: 'יעדי חיסכון עם מעקב אחר הקצב' },
+  { icon: Coins, text: 'יעדי חיסכון עם מעקב אחר הקצב' },
 ];
 
 /** Two-column frame for the login and register screens. */

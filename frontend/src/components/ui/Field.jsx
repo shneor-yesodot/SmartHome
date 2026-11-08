@@ -17,7 +17,7 @@ export function Input({ className, ...props }) {
 
 export function Select({ className, children, ...props }) {
   return (
-    <select className={clsx('input appearance-none bg-[length:16px] bg-[left_12px_center] bg-no-repeat pe-3 ps-9', className)} style={{ backgroundImage: CHEVRON }} {...props}>
+    <select className={clsx('input appearance-none bg-[length:16px] bg-[left_12px_center] bg-no-repeat pe-9 ps-3.5', className)} style={{ backgroundImage: CHEVRON }} {...props}>
       {children}
     </select>
   );

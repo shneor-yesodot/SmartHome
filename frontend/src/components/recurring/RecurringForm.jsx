@@ -5,6 +5,8 @@ import TypeToggle from '../ui/TypeToggle';
 import { Field, Input, Select } from '../ui/Field';
 import { useCategories } from '../../context/CategoriesContext';
 import { useAction } from '../../hooks/useAction';
+import { useFetch } from '../../hooks/useFetch';
+import { accountService } from '../../services/account.service';
 import { recurringService } from '../../services/recurring.service';
 import { FREQUENCY_LABELS } from '../../constants/options';
 import { toInputDate, todayInput } from '../../utils/format';
@@ -19,6 +21,7 @@ export default function RecurringForm({ open, payment, onClose, onSaved }) {
 
 function FormBody({ payment, onClose, onSaved }) {
   const { byType } = useCategories();
+  const { data: accounts } = useFetch(accountService.list, []);
   const { run, pending } = useAction();
   const [form, setForm] = useState({
     type: payment?.type || 'expense',
@@ -26,6 +29,7 @@ function FormBody({ payment, onClose, onSaved }) {
     merchant: payment?.merchant || '',
     amount: payment?.amount ?? '',
     category: payment?.category?.id || '',
+    account: payment?.account?.id || '',
     frequency: payment?.frequency || 'monthly',
     startDate: payment ? toInputDate(payment.nextRun) : todayInput(),
   });
@@ -33,7 +37,7 @@ function FormBody({ payment, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    const payload = { ...form, amount: Number(form.amount) };
+    const payload = { ...form, amount: Number(form.amount), account: form.account || null };
     const { ok } = await run(
       () => (payment ? recurringService.update(payment.id, payload) : recurringService.create(payload)),
       payment ? 'הוראת הקבע עודכנה' : 'הוראת הקבע נוספה'
@@ -79,6 +83,16 @@ function FormBody({ payment, onClose, onSaved }) {
           <Input type="date" required value={form.startDate} onChange={set('startDate')} />
         </Field>
       </div>
+      <Field label="יורד מ..." hint="חשבון העו״ש או כרטיס האשראי של ההוראה">
+        <Select value={form.account} onChange={set('account')}>
+          <option value="">לא צוין</option>
+          {accounts?.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Field label="בית עסק / גורם משלם">
         <Input maxLength={80} value={form.merchant} onChange={set('merchant')} placeholder="לא חובה" />
       </Field>

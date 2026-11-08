@@ -13,6 +13,8 @@ const fields = {
   productName: shortText(120).allow('').label('שם מוצר'),
   quantity: Joi.number().positive().max(100000).label('כמות'),
   unitPrice: Joi.number().min(0).precision(2).label('מחיר ליחידה'),
+  account: objectId().allow(null, '').label('אמצעי תשלום'),
+  chargeDate: Joi.date().iso().max('2100-01-01').allow(null).label('תאריך חיוב'),
 };
 
 const create = Joi.object({
@@ -31,6 +33,8 @@ const listQuery = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
   type: type(),
   category: objectId(),
+  account: objectId(),
+  chargeDate: Joi.date().iso(),
   source: Joi.string().valid(...TRANSACTION_SOURCES),
   from: Joi.date().iso(),
   to: Joi.date().iso(),
@@ -58,4 +62,34 @@ const bulkCreate = Joi.object({
     .label('שורות'),
 });
 
-module.exports = { create, update, listQuery, bulkCreate };
+const purchaseItem = Joi.object({
+  name: shortText(120).min(1).required().label('שם המוצר'),
+  quantity: fields.quantity.default(1),
+  total: money().required().label('סכום'),
+  category: objectId().allow(null).label('קטגוריה'),
+});
+
+// One purchase split into products (e.g. a grocery run) - every item becomes a transaction
+const basket = Joi.object({
+  merchant: fields.merchant.default(''),
+  date: fields.date.required(),
+  notes: fields.notes,
+  account: fields.account,
+  // An imported statement line these items replace, instead of counting the money again
+  payment: objectId().allow(null),
+  items: Joi.array().items(purchaseItem).min(1).max(200).required().label('מוצרים'),
+});
+
+// An existing transaction, usually a statement line, broken into the items it was made of
+const split = Joi.object({
+  items: Joi.array().items(purchaseItem).min(2).max(200).required().label('מוצרים'),
+});
+
+// A purchase about to be saved: which imported statement lines it may be
+const paymentQuery = Joi.object({
+  date: fields.date.required(),
+  total: money().required(),
+  merchant: shortText(80).allow(''),
+});
+
+module.exports = { create, update, listQuery, bulkCreate, basket, split, paymentQuery };

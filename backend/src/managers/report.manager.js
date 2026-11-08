@@ -1,8 +1,6 @@
 const transactionRepository = require('../repositories/transaction.repository');
-const { monthRange, shiftMonth, daysInMonth } = require('../utils/dateUtils');
+const { periodOf, shiftPeriod, dayOfPeriod, describePeriod } = require('../utils/period');
 const { round2, percentOf, percentChange, totalsByType } = require('../utils/finance');
-
-const HEBREW_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
 /** Groups transactions of one type by category, largest first. */
 const breakdownByCategory = (transactions, type) => {
@@ -35,23 +33,65 @@ const withSavings = (totals) => ({
   savingsRate: totals.income > 0 ? round2((totals.balance / totals.income) * 100) : 0,
 });
 
-const monthly = async (userId, { year, month }) => {
-  const { from, to } = monthRange(year, month);
-  const prev = shiftMonth(year, month, -1);
-  const prevRange = monthRange(prev.year, prev.month);
+/**
+ * The month summary in the shape of a household summary sheet: income,
+ * day-to-day expenses by category, standing orders, maaser and the balance.
+ */
+const summarize = (transactions, totals) => {
+  const expenses = transactions.filter((t) => t.type === 'expense');
+  const isDonation = (t) => Boolean(t.category?.isMaaser);
+  const standing = expenses.filter((t) => t.source === 'recurring' && !isDonation(t));
+  const donations = expenses.filter(isDonation);
+  const daily = expenses.filter((t) => t.source !== 'recurring' && !isDonation(t));
+  const sum = (items) => round2(items.reduce((s, t) => s + t.amount, 0));
+  const byDate = (a, b) => new Date(a.date) - new Date(b.date);
+
+  // How much left through each checking account and card
+  const accounts = new Map();
+  for (const t of expenses) {
+    const key = String(t.account?._id || 'none');
+    const row = accounts.get(key) || { accountId: key, name: t.account?.name || 'ללא אמצעי תשלום', color: t.account?.color || '#7C8B83', total: 0 };
+    row.total = round2(row.total + t.amount);
+    accounts.set(key, row);
+  }
+  return {
+    byAccount: [...accounts.values()].sort((a, b) => b.total - a.total),
+    income: breakdownByCategory(transactions, 'income'),
+    dailyExpenses: breakdownByCategory(daily, 'expense'),
+    standingOrders: standing.map((t) => ({ id: String(t._id), description: t.description, amount: t.amount, date: t.date })).sort(byDate),
+    donations: donations.map((t) => ({ id: String(t._id), recipient: t.merchant || t.description, amount: t.amount, date: t.date })).sort(byDate),
+    totals: {
+      income: totals.income,
+      dailyExpenses: sum(daily),
+      standingOrders: sum(standing),
+      donations: sum(donations),
+      expense: totals.expense,
+      balance: totals.balance,
+    },
+  };
+};
+
+/** Report of one month - Gregorian or Hebrew - compared with the month before it. */
+const monthly = async (userId, period) => {
+  const prevPeriod = shiftPeriod(period, -1);
 
   const [transactions, previousTransactions] = await Promise.all([
-    transactionRepository.findInRange(userId, from, to, { populate: 'category' }),
-    transactionRepository.findInRange(userId, prevRange.from, prevRange.to, { populate: 'category' }),
+    transactionRepository.findInRange(userId, period.from, period.to, { populate: 'category account' }),
+    transactionRepository.findInRange(userId, prevPeriod.from, prevPeriod.to, { populate: 'category' }),
   ]);
 
   const totals = withSavings(totalsByType(transactions));
   const previous = withSavings(totalsByType(previousTransactions));
 
   // Day-by-day series for the chart
-  const daily = Array.from({ length: daysInMonth(year, month) }, (_, i) => ({ day: i + 1, income: 0, expense: 0 }));
+  const daily = Array.from({ length: period.days }, (_, i) => ({
+    day: i + 1,
+    date: new Date(period.from.getTime() + i * 86400000),
+    income: 0,
+    expense: 0,
+  }));
   transactions.forEach((t) => {
-    const slot = daily[new Date(t.date).getUTCDate() - 1];
+    const slot = daily[dayOfPeriod(t.date, period) - 1];
     slot[t.type] = round2(slot[t.type] + t.amount);
   });
 
@@ -75,7 +115,8 @@ const monthly = async (userId, { year, month }) => {
     });
 
   return {
-    period: { year, month, label: `${HEBREW_MONTHS[month]} ${year}` },
+    period: describePeriod(period),
+    previousPeriod: describePeriod(prevPeriod),
     totals,
     previous,
     change: {
@@ -86,6 +127,7 @@ const monthly = async (userId, { year, month }) => {
     daily,
     categories,
     incomeCategories: breakdownByCategory(transactions, 'income'),
+    summary: summarize(transactions, totals),
     topMerchants: [...merchants.values()]
       .map((m) => ({ ...m, total: round2(m.total) }))
       .sort((a, b) => b.total - a.total)
@@ -94,4 +136,10 @@ const monthly = async (userId, { year, month }) => {
   };
 };
 
-module.exports = { monthly, breakdownByCategory, HEBREW_MONTHS };
+/** The last `count` months in a calendar, newest first - for month pickers. */
+const periods = ({ calendar = 'gregorian', count = 12 } = {}, now = new Date()) => {
+  const current = periodOf(now, calendar);
+  return Array.from({ length: count }, (_, i) => describePeriod(shiftPeriod(current, -i)));
+};
+
+module.exports = { monthly, periods, breakdownByCategory, summarize };

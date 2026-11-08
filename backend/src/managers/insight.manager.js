@@ -5,34 +5,34 @@ const productManager = require('./product.manager');
 const { breakdownByCategory } = require('./report.manager');
 const geminiService = require('../services/gemini.service');
 const logger = require('../utils/logger');
-const { monthRange, currentMonth, shiftMonth } = require('../utils/dateUtils');
+const { periodOf, shiftPeriod, dayOfPeriod } = require('../utils/period');
 const { totalsByType, percentChange, round2 } = require('../utils/finance');
 
 const money = (n) => `${Math.round(n).toLocaleString('he-IL')} ₪`;
 const ALLOWED_TYPES = ['positive', 'warning', 'tip'];
 
 /** Aggregated figures only - no names, merchants or free text are sent to the AI. */
-const buildSummary = async (userId) => {
-  const { year, month } = currentMonth();
-  const prev = shiftMonth(year, month, -1);
-  const current = monthRange(year, month);
-  const previous = monthRange(prev.year, prev.month);
+const buildSummary = async (userId, calendar = 'gregorian') => {
+  const now = new Date();
+  const current = periodOf(now, calendar);
+  const previous = shiftPeriod(current, -1);
 
-  const [thisMonth, lastMonth, budgets, goals, catalogue] = await Promise.all([
+  const [thisMonth, lastMonth, budgets, savings, catalogue] = await Promise.all([
     transactionRepository.findInRange(userId, current.from, current.to, { populate: 'category' }),
     transactionRepository.findInRange(userId, previous.from, previous.to, { populate: 'category' }),
-    budgetManager.list(userId, { year, month }),
-    goalManager.list(userId),
+    budgetManager.list(userId, current),
+    goalManager.list(userId, { now, calendar }),
     productManager.list(userId),
   ]);
 
   return {
-    dayOfMonth: new Date().getUTCDate(),
+    dayOfMonth: dayOfPeriod(now, current),
     thisMonth: totalsByType(thisMonth),
     lastMonth: totalsByType(lastMonth),
     topCategories: breakdownByCategory(thisMonth, 'expense').slice(0, 5).map(({ name, total, percent }) => ({ name, total, percent })),
     budgets: budgets.map((b) => ({ category: b.category.name, limit: b.amount, spent: b.spent, percent: b.percent })),
-    goals: goals.map((g) => ({ name: g.name, percent: g.progress.percent, status: g.progress.status, monthlyNeeded: g.progress.monthlyNeeded })),
+    goals: savings.goals.map((g) => ({ name: g.name, percent: g.progress.percent, status: g.progress.status, monthlyNeeded: g.progress.monthlyNeeded, affordable: g.progress.affordable })),
+    savingsPlan: savings.month,
     products: {
       potentialSaving: catalogue.stats.potentialSaving,
       risingPrices: catalogue.products.filter((p) => p.priceChange > 5).slice(0, 3).map((p) => ({ name: p.name, change: p.priceChange })),
@@ -60,6 +60,7 @@ const ruleBasedInsights = (s) => {
   if (top && top.percent >= 35) insights.push({ type: 'tip', title: `${top.name} היא ההוצאה הגדולה ביותר`, text: `${top.percent}% מההוצאות החודש (${money(top.total)}) הלכו לקטגוריה הזו. שווה לבדוק אם אפשר לצמצם בה.` });
 
   s.budgets.filter((b) => b.percent >= 100).forEach((b) => insights.push({ type: 'warning', title: `חריגה מתקציב ${b.category}`, text: `הוצאתם ${money(b.spent)} מתוך תקציב של ${money(b.limit)}.` }));
+  if (s.savingsPlan?.status === 'short' && s.goals.length) insights.push({ type: 'warning', title: 'ההוצאות פוגעות ביעדי החיסכון', text: `אחרי ההוצאות החודש נשארו ${money(Math.max(s.savingsPlan.free, 0))}, והיעדים צריכים עוד ${money(s.savingsPlan.needed)}. חסרים ${money(s.savingsPlan.shortfall)}.` });
   s.goals.filter((g) => g.status === 'behind').slice(0, 1).forEach((g) => insights.push({ type: 'tip', title: `היעד "${g.name}" מפגר`, text: `כדי לעמוד בתאריך היעד צריך להפקיד כ-${money(g.monthlyNeeded)} בחודש.` }));
 
   if (s.products.potentialSaving > 0) insights.push({ type: 'tip', title: 'חיסכון בקניות', text: `לפי היסטוריית המחירים, קנייה של המוצרים הקבועים במקום הזול ביותר תחסוך כ-${money(s.products.potentialSaving)} בסל.` });
@@ -68,8 +69,8 @@ const ruleBasedInsights = (s) => {
   return insights.slice(0, 5);
 };
 
-const generate = async (userId) => {
-  const summary = await buildSummary(userId);
+const generate = async (userId, calendar) => {
+  const summary = await buildSummary(userId, calendar);
   let source = 'rules';
   let insights = ruleBasedInsights(summary);
 

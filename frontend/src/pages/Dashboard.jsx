@@ -14,15 +14,25 @@ import GoalsWidget from '../components/dashboard/GoalsWidget';
 import BudgetStatus from '../components/dashboard/BudgetStatus';
 import RecentTransactions from '../components/dashboard/RecentTransactions';
 import TransactionForm from '../components/transactions/TransactionForm';
+import Segmented from '../components/ui/Segmented';
+import { CALENDAR_OPTIONS } from '../constants/options';
 import { useAuth } from '../context/AuthContext';
+import { useAction } from '../hooks/useAction';
 import { useFetch } from '../hooks/useFetch';
+import { authService } from '../services/auth.service';
 import { dashboardService } from '../services/dashboard.service';
-import { HEBREW_MONTHS } from '../utils/format';
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const { data, loading, error, reload } = useFetch(dashboardService.overview, []);
+  const { user, setUser } = useAuth();
+  const { data, loading, error, reload } = useFetch(dashboardService.overview, [user?.calendar]);
+  const { run, pending } = useAction();
   const [formOpen, setFormOpen] = useState(false);
+
+  // The choice is saved on the user: every screen starts from it
+  const changeCalendar = async (calendar) => {
+    const { ok, result } = await run(() => authService.updateProfile({ calendar }));
+    if (ok) setUser(result.user);
+  };
 
   if (loading && !data) return <PageLoader />;
   if (error) return <ErrorState message={error.message} onRetry={reload} />;
@@ -31,8 +41,9 @@ export default function Dashboard() {
     <>
       <PageHeader
         title={`שלום ${user?.name?.split(' ')[0] || ''} 👋`}
-        subtitle={`סקירת מצב משק הבית שלך לחודש ${HEBREW_MONTHS[data.period.month]}`}
+        subtitle={`סקירת מצב משק הבית שלך לחודש ${data.period.name}`}
       >
+        <Segmented label="לוח שנה" options={CALENDAR_OPTIONS} value={user?.calendar || 'gregorian'} disabled={pending || loading} onChange={changeCalendar} />
         <Button icon={Plus} onClick={() => setFormOpen(true)}>
           עסקה חדשה
         </Button>
@@ -53,7 +64,7 @@ export default function Dashboard() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <ForecastCard forecast={data.forecast} upcoming={data.upcomingRecurring} />
-          <GoalsWidget goals={data.goals} />
+          <GoalsWidget goals={data.goals} plan={data.savingsPlan} />
           <SpendingHeatmap heatmap={data.heatmap} period={data.period} />
         </div>
 

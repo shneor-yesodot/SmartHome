@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Info, Plus, Trash2 } from 'lucide-react';
 import Button from '../ui/Button';
 import { Field, Input, Select } from '../ui/Field';
+import PaymentMatch from '../transactions/PaymentMatch';
 import { useCategories } from '../../context/CategoriesContext';
 import { formatMoney, toInputDate } from '../../utils/format';
 
 let rowId = 0;
-const withKey = (item) => ({ ...item, key: `row-${(rowId += 1)}` });
+// From the receipts list the category arrives populated ({ id, name }); the form needs the id
+const withKey = (item) => ({ ...item, category: item.category?.id || item.category || null, key: `row-${(rowId += 1)}` });
 
 /** The user checks and fixes what the AI read, before anything is saved. */
 export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, onCancel }) {
@@ -15,6 +17,7 @@ export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, 
   const [merchant, setMerchant] = useState(receipt.merchant || '');
   const [date, setDate] = useState(toInputDate(receipt.purchaseDate));
   const [items, setItems] = useState(() => receipt.items.map(withKey));
+  const [payment, setPayment] = useState(null);
 
   const update = (key, field, value) => setItems((list) => list.map((i) => (i.key === key ? { ...i, [field]: value } : i)));
   const remove = (key) => setItems((list) => list.filter((i) => i.key !== key));
@@ -28,6 +31,7 @@ export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, 
     onConfirm({
       merchant,
       date,
+      payment,
       items: items.map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity), total: Number(i.total), category: i.category || null })),
     });
   };
@@ -108,6 +112,10 @@ export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, 
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="border-t border-line px-5 py-4 empty:hidden">
+          <PaymentMatch date={date} total={total} merchant={merchant} value={payment} onChange={setPayment} />
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4">

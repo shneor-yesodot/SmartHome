@@ -3,7 +3,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { ProgressBar, ProgressRing } from '../ui/Progress';
 import { getIcon } from '../../constants/icons';
-import { GOAL_STATUS } from '../../constants/options';
+import { goalStatus } from '../../constants/options';
 import { formatDate, formatMoney } from '../../utils/format';
 
 const daysText = (days) => {
@@ -14,7 +14,7 @@ const daysText = (days) => {
 
 export default function GoalCard({ goal, onDeposit, onEdit, onDelete }) {
   const { progress } = goal;
-  const status = GOAL_STATUS[progress.status];
+  const status = goalStatus(progress);
   const Icon = getIcon(goal.icon);
 
   return (
@@ -68,15 +68,21 @@ export default function GoalCard({ goal, onDeposit, onEdit, onDelete }) {
       </div>
 
       <footer className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
-        <p className="text-sm text-ink-soft">
-          {progress.monthlyNeeded > 0 ? (
+        <div className="text-sm text-ink-soft">
+          {progress.leftThisMonth > 0 ? (
             <>
-              נדרש: <b className="tabular text-ink">{formatMoney(progress.monthlyNeeded, { round: true })}</b> בחודש
+              <p>
+                נשאר להפקיד החודש:{' '}
+                <b className="tabular text-ink">{formatMoney(progress.leftThisMonth, { round: true })}</b>
+              </p>
+              {!progress.affordable && (
+                <p className="mt-0.5 text-xs font-semibold text-warn-600">ההוצאות החודש לא משאירות מספיק ליעד הזה</p>
+              )}
             </>
           ) : (
-            'אין צורך בהפקדות נוספות'
+            <p>{progress.depositedThisMonth > 0 ? 'ההפקדה של החודש הושלמה' : 'אין צורך בהפקדות נוספות'}</p>
           )}
-        </p>
+        </div>
         <Button size="sm" icon={Plus} onClick={() => onDeposit(goal)}>
           הפקדה
         </Button>

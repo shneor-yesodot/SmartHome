@@ -4,6 +4,8 @@ const { objectId, money, shortText } = require('./common.validator');
 const confirm = Joi.object({
   merchant: shortText(80).allow('').default('').label('בית עסק'),
   date: Joi.date().iso().required().label('תאריך הקנייה'),
+  // An imported statement line these items replace (see /transactions/payment-candidates)
+  payment: objectId().allow(null),
   items: Joi.array()
     .items(
       Joi.object({
@@ -19,4 +21,9 @@ const confirm = Joi.object({
     .label('מוצרים'),
 });
 
-module.exports = { confirm };
+const listQuery = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+});
+
+module.exports = { confirm, listQuery };

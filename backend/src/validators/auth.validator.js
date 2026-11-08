@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const { CALENDARS } = require('../config/constants');
 
 const password = () =>
   Joi.string()
@@ -22,6 +23,7 @@ const login = Joi.object({
 const updateProfile = Joi.object({
   name: Joi.string().trim().min(2).max(60).label('שם מלא'),
   notifications: Joi.object({ budgetAlerts: Joi.boolean(), monthlySummary: Joi.boolean() }),
+  calendar: Joi.string().valid(...CALENDARS),
 }).min(1);
 
 const changePassword = Joi.object({
@@ -47,6 +49,29 @@ const resetPassword = Joi.object({
   password: password().required().label('סיסמה חדשה'),
 });
 
-const refreshToken = Joi.object({ refreshToken: Joi.string().max(2000).required().label('טוקן רענון') });
+// A 6-digit authenticator code or a 10-character backup code
+const anyCode = () => Joi.string().trim().pattern(/^(\d{6}|[0-9a-fA-F]{10})$/).required().label('קוד').messages({
+  'string.pattern.base': 'הקוד שגוי',
+});
+const appCode = () => Joi.string().trim().pattern(/^\d{6}$/).required().label('קוד').messages({
+  'string.pattern.base': 'הקוד מורכב מ-6 ספרות',
+});
 
-module.exports = { register, login, updateProfile, changePassword, verifyEmail, emailOnly, resetPassword, refreshToken };
+const twoFactorLogin = Joi.object({ challenge: Joi.string().max(2000).required(), code: anyCode() });
+const twoFactorCode = Joi.object({ code: appCode() });
+const passwordOnly = Joi.object({ password: Joi.string().max(72).required().label('סיסמה') });
+const twoFactorDisable = Joi.object({ password: Joi.string().max(72).required().label('סיסמה'), code: anyCode() });
+
+module.exports = {
+  register,
+  login,
+  updateProfile,
+  changePassword,
+  verifyEmail,
+  emailOnly,
+  resetPassword,
+  twoFactorLogin,
+  twoFactorCode,
+  passwordOnly,
+  twoFactorDisable,
+};

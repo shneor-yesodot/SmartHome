@@ -22,15 +22,39 @@ const secret = (name, devFallback) => {
 
 const clientUrls = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map((s) => s.trim());
 const port = Number(process.env.PORT) || 5000;
+const allowedEmails = (process.env.ALLOWED_EMAILS || '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+/** Google service account for the Sheets sync: raw JSON or base64 of it. */
+const parseServiceAccount = (value) => {
+  if (!value) return null;
+  const text = value.trim().startsWith('{') ? value : Buffer.from(value, 'base64').toString('utf8');
+  const parsed = JSON.parse(text);
+  return { email: parsed.client_email, privateKey: String(parsed.private_key).replace(/\\n/g, '\n') };
+};
 
 const env = {
   nodeEnv,
   isProd,
   isTest: nodeEnv === 'test',
   port,
+  // Empty = every network interface. The desktop launcher sets 127.0.0.1: only this computer
+  host: process.env.HOST || '',
+  // Started by SmartHome.exe: stop (and close the database cleanly) when the launcher goes away
+  stopWithLauncher: process.env.STOP_WITH_LAUNCHER === 'true',
   clientUrls,
   // The first CLIENT_URL is where e-mail links and the Google login send the user back to
   clientUrl: clientUrls[0],
+  // How many reverse proxies stand in front of the app (for the real client IP in rate limits)
+  trustProxy: process.env.TRUST_PROXY === undefined ? 1 : Number(process.env.TRUST_PROXY),
+  // The built React app, when the API serves it itself (the single-container deployment)
+  frontendDir: process.env.FRONTEND_DIR || '',
+  // Who may open an account. Empty = nobody in production, anybody in development.
+  allowedEmails,
+  encryptionKey: secret('ENCRYPTION_KEY', 'dev-only-encryption-key-change-me'),
+  googleServiceAccount: parseServiceAccount(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
   // Empty in development = an embedded MongoDB is started automatically (see config/db.js)
   mongoUri: process.env.MONGO_URI || '',
   embeddedMongoPort: Number(process.env.EMBEDDED_MONGO_PORT) || 27018,

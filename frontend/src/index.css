@@ -48,7 +48,8 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-surface;
+    /* 16px on phones: iOS zooms the whole page when focusing a smaller field */
+    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-base text-ink placeholder:text-ink-muted transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-surface sm:text-sm;
   }
   .label {
     @apply mb-1.5 block text-[13px] font-medium text-ink-soft;
@@ -70,6 +71,18 @@
   /* Numbers line up in tables and cards */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  /* Room for the iPhone home indicator when opened as an app */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .main-with-nav {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 1024px) {
+    .main-with-nav {
+      padding-bottom: 2rem;
+    }
   }
 }
 

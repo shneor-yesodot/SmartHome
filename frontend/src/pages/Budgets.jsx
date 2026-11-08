@@ -9,10 +9,13 @@ import BudgetCard from '../components/budgets/BudgetCard';
 import BudgetForm from '../components/budgets/BudgetForm';
 import { useFetch } from '../hooks/useFetch';
 import { useAction } from '../hooks/useAction';
+import { useAuth } from '../context/AuthContext';
 import { budgetService } from '../services/budget.service';
-import { HEBREW_MONTHS, formatMoney } from '../utils/format';
+import { formatMoney } from '../utils/format';
+import { currentMonthName } from '../utils/hebrewDate';
 
 export default function Budgets() {
+  const { user } = useAuth();
   const { data: budgets, loading, error, reload } = useFetch(budgetService.list, []);
   const [editing, setEditing] = useState(undefined);
   const [deleting, setDeleting] = useState(null);
@@ -35,7 +38,7 @@ export default function Budgets() {
 
   return (
     <>
-      <PageHeader title="תקציבים" subtitle={`תקרת הוצאה חודשית לכל קטגוריה, ${HEBREW_MONTHS[new Date().getMonth()]}`}>
+      <PageHeader title="תקציבים" subtitle={`תקרת הוצאה חודשית לכל קטגוריה, ${currentMonthName(user?.calendar)}`}>
         <Button icon={Plus} onClick={() => setEditing(null)}>
           תקציב חדש
         </Button>

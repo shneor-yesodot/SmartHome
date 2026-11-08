@@ -16,7 +16,7 @@ import { formatDate, formatMoney } from '../utils/format';
 export default function UploadReceipt() {
   const toast = useToast();
   const { run, pending } = useAction();
-  const history = useFetch(receiptService.list, []);
+  const history = useFetch(receiptService.recent, []);
   const [receipt, setReceipt] = useState(null); // scanned, waiting for review
   const [previewUrl, setPreviewUrl] = useState(null);
   const [savedCount, setSavedCount] = useState(null);
@@ -41,7 +41,7 @@ export default function UploadReceipt() {
   const confirm = async (payload) => {
     const { ok, result } = await run(() => receiptService.confirm(receipt.id, payload));
     if (ok) {
-      setSavedCount(result.created);
+      setSavedCount({ created: result.created, linked: result.linked });
       setReceipt(null);
       setPreviewUrl(null);
       history.reload();
@@ -66,8 +66,11 @@ export default function UploadReceipt() {
               <div className="card flex flex-wrap items-center gap-4 border-brand-200 bg-brand-50 p-5">
                 <CheckCircle2 className="h-8 w-8 shrink-0 text-brand-500" />
                 <div className="flex-1">
-                  <p className="font-bold">נשמרו {savedCount} עסקאות מהקבלה</p>
-                  <p className="text-sm text-ink-soft">המוצרים נוספו גם לקטלוג המוצרים, למעקב מחירים.</p>
+                  <p className="font-bold">נשמרו {savedCount.created} עסקאות מהקבלה</p>
+                  <p className="text-sm text-ink-soft">
+                    {savedCount.linked && 'הן החליפו את שורת החיוב מהדף שיובא, כך שההוצאה נספרת פעם אחת. '}
+                    המוצרים נוספו גם לקטלוג המוצרים, למעקב מחירים.
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Link to="/products" className="btn btn-secondary btn-sm">
@@ -82,7 +85,15 @@ export default function UploadReceipt() {
             <ReceiptDropzone scanning={pending} onFile={scan} onInvalid={toast.error} />
           </div>
 
-          <Card title="קבלות אחרונות" icon={FileText}>
+          <Card
+            title="קבלות אחרונות"
+            icon={FileText}
+            action={
+              <Link to="/my-receipts" className="text-sm font-semibold text-brand-600 hover:underline">
+                לכל הקבלות
+              </Link>
+            }
+          >
             {!history.data?.length ? (
               <p className="py-6 text-center text-sm text-ink-muted">הקבלות שתעלו יופיעו כאן.</p>
             ) : (

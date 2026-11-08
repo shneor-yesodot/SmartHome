@@ -12,8 +12,13 @@ router.get('/export', validate(schema.listQuery, 'query'), controller.exportExce
 router.get('/import/template', controller.importTemplate);
 router.post('/import/preview', sheetUpload, requireFile('sheet'), controller.importPreview);
 router.post('/bulk', validate(schema.bulkCreate), controller.bulkCreate);
+router.post('/basket', validate(schema.basket), controller.createBasket);
+router.get('/payment-candidates', validate(schema.paymentQuery, 'query'), controller.paymentCandidates);
 
 router.route('/').get(validate(schema.listQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
+
+router.post('/:id/split', validate(idParam, 'params'), validate(schema.split), controller.split);
+router.get('/:id/purchase', validate(idParam, 'params'), controller.purchase);
 
 router
   .route('/:id')

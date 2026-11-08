@@ -1,22 +1,21 @@
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BarChart3, ChevronLeft, ChevronRight, Percent, PiggyBank, TrendingDown, TrendingUp } from 'lucide-react';
+import { BarChart3, Coins, Percent, TrendingDown, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
+import PeriodNav from '../components/ui/PeriodNav';
 import StatCard from '../components/ui/StatCard';
 import { ProgressBar } from '../components/ui/Progress';
 import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
 import { ChartTooltip, axisProps } from '../components/dashboard/IncomeExpenseChart';
 import { PriceChange } from '../components/products/ProductCard';
+import MonthSummary from '../components/reports/MonthSummary';
+import { useAuth } from '../context/AuthContext';
 import { useFetch } from '../hooks/useFetch';
 import { reportService } from '../services/report.service';
 import { CHART_COLORS } from '../constants/options';
-import { formatChange, formatMoney, monthLabel } from '../utils/format';
-
-const shift = ({ year, month }, delta) => {
-  const d = new Date(Date.UTC(year, month + delta, 1));
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
-};
+import { formatChange, formatMoney } from '../utils/format';
+import { dayNumber, formatDay } from '../utils/hebrewDate';
 
 const versusPrevious = (change) => {
   if (change === null) return 'אין נתוני השוואה';
@@ -24,25 +23,28 @@ const versusPrevious = (change) => {
 };
 
 export default function Reports() {
-  const now = new Date();
-  const current = { year: now.getFullYear(), month: now.getMonth() };
-  const [period, setPeriod] = useState(current);
-  const isCurrent = period.year === current.year && period.month === current.month;
+  const { user } = useAuth();
+  const [calendar, setCalendar] = useState(user?.calendar || 'gregorian');
+  const [anchor, setAnchor] = useState(null); // any day of the month shown; null = this month
 
-  const { data, loading, error, reload } = useFetch(() => reportService.monthly(period.year, period.month), [period.year, period.month]);
+  const { data, loading, error, reload } = useFetch(() => reportService.monthly({ calendar, date: anchor || undefined }), [calendar, anchor]);
+  const period = data?.period;
 
   return (
     <>
       <PageHeader title="דוחות" subtitle="סיכום חודשי והשוואה לחודש הקודם">
-        <div className="card flex items-center gap-1 p-1">
-          <button className="icon-btn" onClick={() => setPeriod((p) => shift(p, -1))} aria-label="החודש הקודם">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-          <span className="min-w-[124px] text-center text-sm font-bold">{monthLabel(period.year, period.month)}</span>
-          <button className="icon-btn disabled:opacity-40" disabled={isCurrent} onClick={() => setPeriod((p) => shift(p, 1))} aria-label="החודש הבא">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-        </div>
+        <PeriodNav
+          period={period}
+          calendar={calendar}
+          onCalendarChange={(value) => {
+            // The current month stays current; an older month moves to the month around its middle
+            if (period && anchor && new Date(period.end) < new Date(new Date().toDateString())) {
+              setAnchor(new Date(new Date(period.start).getTime() + (period.days / 2) * 86400000).toISOString().slice(0, 10));
+            } else setAnchor(null);
+            setCalendar(value);
+          }}
+          onAnchorChange={setAnchor}
+        />
       </PageHeader>
 
       {error ? (
@@ -57,7 +59,7 @@ export default function Reports() {
             <StatCard
               label="חיסכון"
               value={formatMoney(data.totals.savings, { round: true })}
-              icon={PiggyBank}
+              icon={Coins}
               tone={data.totals.savings < 0 ? 'danger' : 'neutral'}
               footnote={`בחודש הקודם: ${formatMoney(data.previous.savings, { round: true })}`}
             />
@@ -70,14 +72,16 @@ export default function Reports() {
             </div>
           ) : (
             <>
+              <MonthSummary summary={data.summary} period={period} />
+
               <Card title="הוצאות יומיות">
                 <div dir="ltr" className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.daily} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
                       <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="4 4" vertical={false} />
-                      <XAxis dataKey="day" {...axisProps} interval={1} />
+                      <XAxis dataKey="day" {...axisProps} interval="preserveStartEnd" minTickGap={6} tickFormatter={(day) => dayNumber(day, period.calendar)} />
                       <YAxis {...axisProps} width={52} tickFormatter={(v) => v.toLocaleString('he-IL')} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: '#EDF8F2' }} labelFormatter={(day) => `${day}/${period.month + 1}`} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ fill: '#EDF8F2' }} labelFormatter={(day) => formatDay(data.daily[day - 1].date, period.calendar)} />
                       <Bar dataKey="expense" name="הוצאות" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} maxBarSize={18} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -85,7 +89,7 @@ export default function Reports() {
               </Card>
 
               <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-                <Card title="פילוח הוצאות לפי קטגוריה">
+                <Card title="פילוח הוצאות לפי קטגוריה" className="min-w-0">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[480px]">
                       <thead>

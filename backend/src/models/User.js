@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { USER_ROLES } = require('../config/constants');
+const { USER_ROLES, CALENDARS, MAASER_MODES, SHEET_SYNC_MODES } = require('../config/constants');
 const { baseOptions } = require('./plugins');
 
 const SALT_ROUNDS = 12;
@@ -15,6 +15,16 @@ const userSchema = new Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     role: { type: String, enum: USER_ROLES, default: 'user' },
     currency: { type: String, default: 'ILS' },
+    // Which months the dashboard, budgets and reports are counted by
+    calendar: { type: String, enum: CALENDARS, default: 'gregorian' },
+    // Maaser target: a percent of each month's income, or a fixed monthly amount.
+    // Unpaid (or overpaid) amounts carry over from `startDate` on.
+    maaser: {
+      mode: { type: String, enum: MAASER_MODES, default: 'percent' },
+      percent: { type: Number, default: 10, min: 1, max: 100 },
+      amount: { type: Number, default: 2000, min: 0 },
+      startDate: Date,
+    },
     emailVerified: { type: Boolean, default: false },
     googleId: { type: String, index: { unique: true, sparse: true }, select: false },
     notifications: {
@@ -22,6 +32,15 @@ const userSchema = new Schema(
       monthlySummary: { type: Boolean, default: true },
     },
     lastLoginAt: Date,
+    twoFactorEnabled: { type: Boolean, default: false },
+    // Backup to a Google spreadsheet (see managers/sheets.manager.js)
+    sheets: {
+      spreadsheetId: String,
+      mode: { type: String, enum: SHEET_SYNC_MODES, default: 'backup' },
+      autoSync: { type: Boolean, default: true },
+      lastSyncAt: Date,
+      lastError: String,
+    },
 
     // ---- Secrets: never selected by default, never serialized ----
     // Refresh token ids (jti), one active per logged-in device. Rotated ids stay
@@ -31,6 +50,11 @@ const userSchema = new Schema(
     otp: { type: { hash: String, expiresAt: Date, attempts: Number }, select: false },
     // Password reset token (stored hashed)
     passwordReset: { type: { hash: String, expiresAt: Date }, select: false },
+    // Authenticator app: encrypted secret, hashed one-time backup codes, last accepted time step
+    twoFactor: { type: { secret: String, backupCodes: [String], lastStep: Number }, select: false },
+    // Failed password attempts, for locking the account for a while
+    failedLogins: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, select: false },
   },
   baseOptions
 );

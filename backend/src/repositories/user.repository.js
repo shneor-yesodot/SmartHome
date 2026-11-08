@@ -10,6 +10,7 @@ const userRepository = {
   findByEmail: (email, fields) => withFields(User.findOne({ email: normalizeEmail(email) }), fields).exec(),
   findByIdWithPassword: (id) => User.findById(id).select('+password +sessions').exec(),
   findByGoogleId: (googleId) => User.findOne({ googleId }).select('+sessions').exec(),
+  findForSheetsSync: () => User.find({ 'sheets.spreadsheetId': { $exists: true, $ne: null }, 'sheets.autoSync': true }).exec(),
   findByResetHash: (hash) =>
     User.findOne({ 'passwordReset.hash': hash, 'passwordReset.expiresAt': { $gt: new Date() } })
       .select('+password +passwordReset +sessions')

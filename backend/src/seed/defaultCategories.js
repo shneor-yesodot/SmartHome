@@ -8,6 +8,7 @@ module.exports = [
   { name: 'ילדים וחינוך', type: 'expense', icon: 'GraduationCap', color: '#7B61D9' },
   { name: 'ביגוד והנעלה', type: 'expense', icon: 'Shirt', color: '#1FA6A6' },
   { name: 'תקשורת ומנויים', type: 'expense', icon: 'Smartphone', color: '#5C6BC0' },
+  { name: 'צדקה ומעשרות', type: 'expense', icon: 'HandHeart', color: '#B7791F', isMaaser: true },
   { name: 'אחר', type: 'expense', icon: 'MoreHorizontal', color: '#7C8B83' },
   { name: 'משכורת', type: 'income', icon: 'Briefcase', color: '#12A05C' },
   { name: 'קצבאות והחזרים', type: 'income', icon: 'Landmark', color: '#2F7FD1' },

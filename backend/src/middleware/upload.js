@@ -26,6 +26,16 @@ const sheetUpload = multer({
       : cb(ApiError.badRequest('ניתן להעלות קובץ Excel (‎.xlsx) או CSV בלבד')),
 }).single('file');
 
+// Banks export .xlsx, old .xls, HTML saved as .xls, or CSV
+const statementUpload = multer({
+  storage,
+  limits,
+  fileFilter: (_req, file, cb) =>
+    /\.(xlsx|xls|csv|html?)$/i.test(file.originalname)
+      ? cb(null, true)
+      : cb(ApiError.badRequest('ניתן להעלות דף תנועות בפורמט Excel (‎.xlsx, ‎.xls) או CSV בלבד')),
+}).single('file');
+
 /** Second line of defence: the file content must match the declared type. */
 const requireFile = (kind) => (req, _res, next) => {
   if (!req.file) return next(ApiError.badRequest('לא נבחר קובץ'));
@@ -40,4 +50,4 @@ const requireFile = (kind) => (req, _res, next) => {
   next();
 };
 
-module.exports = { receiptUpload, sheetUpload, requireFile };
+module.exports = { receiptUpload, sheetUpload, statementUpload, requireFile };

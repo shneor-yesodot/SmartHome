@@ -14,12 +14,15 @@ import OAuthCallback from '../pages/OAuthCallback';
 
 // Secondary screens are loaded on demand to keep the first load small
 const Transactions = lazy(() => import('../pages/Transactions'));
+const Cards = lazy(() => import('../pages/Cards'));
 const Products = lazy(() => import('../pages/Products'));
 const Reports = lazy(() => import('../pages/Reports'));
 const Budgets = lazy(() => import('../pages/Budgets'));
 const Goals = lazy(() => import('../pages/Goals'));
 const Recurring = lazy(() => import('../pages/Recurring'));
 const UploadReceipt = lazy(() => import('../pages/UploadReceipt'));
+const MyReceipts = lazy(() => import('../pages/MyReceipts'));
+const Maaser = lazy(() => import('../pages/Maaser'));
 const Settings = lazy(() => import('../pages/Settings'));
 
 export default function AppRouter() {
@@ -41,12 +44,15 @@ export default function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/cards" element={<Cards />} />
             <Route path="/products" element={<Products />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/maaser" element={<Maaser />} />
             <Route path="/recurring" element={<Recurring />} />
             <Route path="/receipts" element={<UploadReceipt />} />
+            <Route path="/my-receipts" element={<MyReceipts />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

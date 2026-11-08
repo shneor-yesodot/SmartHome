@@ -1,12 +1,12 @@
 const { Router } = require('express');
 const controller = require('../controllers/budget.controller');
 const schema = require('../validators/budget.validator');
-const { idParam, monthQuery } = require('../validators/common.validator');
+const { idParam, periodQuery } = require('../validators/common.validator');
 const validate = require('../middleware/validate');
 
 const router = Router();
 
-router.route('/').get(validate(monthQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
+router.route('/').get(validate(periodQuery, 'query'), controller.list).post(validate(schema.create), controller.create);
 
 router
   .route('/:id')

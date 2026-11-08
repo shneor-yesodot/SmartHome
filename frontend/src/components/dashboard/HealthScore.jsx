@@ -1,8 +1,8 @@
-import { Activity, PiggyBank, Target, TrendingUp } from 'lucide-react';
+import { Activity, Coins, Target, TrendingUp } from 'lucide-react';
 import Card from '../ui/Card';
 import { ProgressBar, ProgressRing } from '../ui/Progress';
 
-const FACTOR_ICONS = { savings: PiggyBank, budget: Target, trend: TrendingUp };
+const FACTOR_ICONS = { savings: Coins, budget: Target, trend: TrendingUp };
 const LEVEL_TONE = { excellent: 'success', good: 'success', fair: 'warning', poor: 'danger' };
 const LEVEL_TEXT = { success: 'text-brand-600', warning: 'text-warn-600', danger: 'text-danger-500' };
 

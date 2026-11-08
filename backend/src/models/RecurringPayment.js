@@ -10,6 +10,8 @@ const recurringPaymentSchema = new Schema(
     type: { type: String, enum: TRANSACTION_TYPES, default: 'expense' },
     amount: { type: Number, required: true, min: 0.01 },
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
+    // Which checking account or credit card it is charged to
+    account: { type: Schema.Types.ObjectId, ref: 'Account' },
     frequency: { type: String, enum: FREQUENCIES, default: 'monthly' },
     nextRun: { type: Date, required: true },
     lastRun: Date,

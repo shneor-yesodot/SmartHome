@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Download, FileUp, Plus, Receipt } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Download, FileUp, Landmark, Plus, Receipt } from 'lucide-react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import Pagination from '../components/ui/Pagination';
@@ -9,6 +10,7 @@ import TransactionFilters, { EMPTY_FILTERS } from '../components/transactions/Tr
 import TransactionTable from '../components/transactions/TransactionTable';
 import TransactionForm from '../components/transactions/TransactionForm';
 import ImportExcelModal from '../components/transactions/ImportExcelModal';
+import ImportStatementModal from '../components/transactions/ImportStatementModal';
 import { useFetch } from '../hooks/useFetch';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAction } from '../hooks/useAction';
@@ -26,6 +28,8 @@ export default function Transactions() {
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new
   const [deleting, setDeleting] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { run, pending } = useAction();
 
   const search = useDebounce(filters.search);
@@ -34,6 +38,14 @@ export default function Transactions() {
 
   // Any change of filters returns to the first page
   useEffect(() => setPage(1), [queryKey]);
+
+  // The + button on phones and the app-icon shortcut open a new transaction right away
+  useEffect(() => {
+    if (searchParams.get('new')) {
+      setEditing(null);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data, loading, error, reload } = useFetch(
     () => transactionService.list({ ...query, page, limit: PAGE_SIZE }),
@@ -60,10 +72,13 @@ export default function Transactions() {
   return (
     <>
       <PageHeader title="עסקאות" subtitle="כל ההכנסות וההוצאות של משק הבית">
-        <Button variant="secondary" icon={FileUp} onClick={() => setImportOpen(true)}>
+        <Button variant="secondary" icon={Landmark} onClick={() => setStatementOpen(true)}>
+          יבוא דף בנק / אשראי
+        </Button>
+        <Button variant="secondary" icon={FileUp} className="hidden sm:inline-flex" onClick={() => setImportOpen(true)}>
           יבוא Excel
         </Button>
-        <Button variant="secondary" icon={Download} onClick={exportExcel} disabled={pending || !items.length}>
+        <Button variant="secondary" icon={Download} className="hidden sm:inline-flex" onClick={exportExcel} disabled={pending || !items.length}>
           יצוא Excel
         </Button>
         <Button icon={Plus} onClick={() => setEditing(null)}>
@@ -124,6 +139,15 @@ export default function Transactions() {
         onClose={() => setImportOpen(false)}
         onImported={(count) => {
           toast.success(`יובאו ${count} עסקאות`);
+          reload();
+        }}
+      />
+      <ImportStatementModal
+        open={statementOpen}
+        onClose={() => setStatementOpen(false)}
+        onImported={({ created, linked, skipped }) => {
+          const parts = [`יובאו ${created} תנועות`, linked && `${linked} קושרו לפריטים`, skipped && `${skipped} כבר היו במערכת`];
+          toast.success(parts.filter(Boolean).join(', '));
           reload();
         }}
       />

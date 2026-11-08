@@ -1,11 +1,11 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function Pagination({ page, pages, total, onChange }) {
+export default function Pagination({ page, pages, total, unit = 'עסקאות', onChange }) {
   if (pages <= 1) return null;
   return (
     <nav className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm" aria-label="דפדוף">
       <span className="text-ink-muted">
-        עמוד {page} מתוך {pages} ({total} עסקאות)
+        עמוד {page} מתוך {pages} ({total} {unit})
       </span>
       <div className="flex gap-1">
         {/* In RTL the "previous" arrow points right */}

@@ -13,6 +13,11 @@ export default function ForecastCard({ forecast, upcoming }) {
       <p className={`tabular mt-1 text-[28px] font-extrabold ${positive ? 'text-brand-600' : 'text-danger-500'}`}>
         {formatSigned(forecast.projectedBalance, { round: true })}
       </p>
+      {forecast.oneOffExpense > 0 && (
+        <p className="mt-1 text-xs text-ink-muted">
+          הוצאות חד-פעמיות גדולות ({formatMoney(forecast.oneOffExpense, { round: true })}) נספרו פעם אחת ולא הוכפלו בתחזית.
+        </p>
+      )}
 
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 text-sm">
         <div>

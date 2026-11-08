@@ -35,8 +35,8 @@ export default function Modal({ open, onClose, title, size = 'md', children, foo
             <X className="h-5 w-5" />
           </button>
         </header>
-        <div className="overflow-y-auto px-5 py-5">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-line px-5 py-4">{footer}</footer>}
+        <div className="pb-safe overflow-y-auto px-5 py-5">{children}</div>
+        {footer && <footer className="pb-safe flex justify-end gap-2 border-t border-line px-5 py-4">{footer}</footer>}
       </div>
     </div>,
     document.body
