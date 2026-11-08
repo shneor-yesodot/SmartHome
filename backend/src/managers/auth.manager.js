@@ -15,7 +15,9 @@ const ApiError = require('../utils/ApiError');
 const INVALID_CREDENTIALS = 'האימייל או הסיסמה שגויים';
 const SESSION_EXPIRED = 'פג תוקף ההתחברות. יש להתחבר מחדש';
 const OTP_TTL_MS = 10 * 60 * 1000;
+// Wrong codes allowed per hour, whatever the number of codes sent in it
 const OTP_MAX_ATTEMPTS = 5;
+const OTP_WINDOW_MS = 60 * 60 * 1000;
 const RESET_TTL_MS = 60 * 60 * 1000;
 const MAX_FAILED_LOGINS = 5;
 const LOCK_MS = 15 * 60 * 1000;
@@ -73,7 +75,14 @@ const recordFailure = async (user) => {
 
 const sendVerificationCode = async (user) => {
   const code = tokenService.randomCode();
-  user.otp = { hash: tokenService.hashSecret(code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
+  const previous = user.otp;
+  const sameWindow = previous?.windowStart && Date.now() - previous.windowStart < OTP_WINDOW_MS;
+  user.otp = {
+    hash: tokenService.hashSecret(code),
+    expiresAt: new Date(Date.now() + OTP_TTL_MS),
+    attempts: sameWindow ? previous.attempts || 0 : 0,
+    windowStart: sameWindow ? previous.windowStart : new Date(),
+  };
   await user.save();
   await emailService.sendVerificationCode(user, code);
 };
@@ -210,11 +219,18 @@ const verifyEmail = async ({ email, code }) => {
   const user = await userRepository.findByEmail(email, ['otp', 'sessions']);
   const otp = user?.otp;
   if (!user || user.emailVerified || !otp?.hash) throw ApiError.badRequest('אין קוד אימות פעיל. בקשו קוד חדש');
-  if (otp.expiresAt < new Date() || otp.attempts >= OTP_MAX_ATTEMPTS) {
-    throw ApiError.badRequest('פג תוקף הקוד. בקשו קוד חדש');
+  if (otp.attempts >= OTP_MAX_ATTEMPTS && (!otp.windowStart || Date.now() - otp.windowStart < OTP_WINDOW_MS)) {
+    throw ApiError.badRequest('יותר מדי קודים שגויים. נסו שוב בעוד שעה');
   }
+  if (otp.expiresAt < new Date()) throw ApiError.badRequest('פג תוקף הקוד. בקשו קוד חדש');
   if (tokenService.hashSecret(code) !== otp.hash) {
-    user.otp = { hash: otp.hash, expiresAt: otp.expiresAt, attempts: otp.attempts + 1 };
+    const newWindow = !otp.windowStart || Date.now() - otp.windowStart >= OTP_WINDOW_MS;
+    user.otp = {
+      hash: otp.hash,
+      expiresAt: otp.expiresAt,
+      attempts: newWindow ? 1 : (otp.attempts || 0) + 1,
+      windowStart: newWindow ? new Date() : otp.windowStart,
+    };
     await user.save();
     throw ApiError.badRequest('הקוד שגוי');
   }

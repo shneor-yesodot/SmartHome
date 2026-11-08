@@ -64,6 +64,12 @@ class TransactionRepository extends BaseRepository {
     return new Set(rows.map((r) => r.importHash));
   }
 
+  /** Which of these sheet rows were already created in the app. */
+  async existingSheetKeys(userId, keys) {
+    const rows = await this.model.find({ user: userId, sheetKey: { $in: keys } }).select('+sheetKey').lean();
+    return new Set(rows.map((r) => r.sheetKey));
+  }
+
   /** Items of purchases dated in [from, to), with their import fingerprints. */
   findPurchaseItems(userId, from, to) {
     return this.model

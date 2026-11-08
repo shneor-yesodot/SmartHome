@@ -30,10 +30,14 @@ const addDays = (date, days) => new Date(new Date(date).getTime() + days * 86400
 
 const diffInDays = (from, to) => Math.round((startOfDay(to) - startOfDay(from)) / 86400000);
 
-/** Next occurrence of a recurring payment. Month ends are clamped (31 Jan -> 28/29 Feb). */
-const addFrequency = (date, frequency) => {
+/**
+ * Next occurrence of a recurring payment. Month ends are clamped (31 Jan -> 28/29 Feb).
+ * `dayOfMonth` is the payment's own day, so after a short month it goes back to it
+ * (31 Jan -> 28 Feb -> 31 Mar) instead of staying on the shorter day.
+ */
+const addFrequency = (date, frequency, dayOfMonth) => {
   const d = new Date(date);
-  const day = d.getUTCDate();
+  const day = dayOfMonth || d.getUTCDate();
   const jumpMonths = (count) => {
     const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + count, 1));
     const lastDay = daysInMonth(target.getUTCFullYear(), target.getUTCMonth());

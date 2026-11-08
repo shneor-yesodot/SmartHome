@@ -11,6 +11,6 @@ const remove = asyncHandler(async (req, res) => {
   await recurringManager.remove(req.user.id, req.params.id);
   noContent(res);
 });
-const runNow = asyncHandler(async (req, res) => created(res, await recurringManager.runNow(req.user.id, req.params.id)));
+const runNow = asyncHandler(async (req, res) => created(res, await recurringManager.runNow(req.user.id, req.params.id, req.body)));
 
 module.exports = { list, create, update, remove, runNow };

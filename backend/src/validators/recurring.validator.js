@@ -26,4 +26,7 @@ const create = Joi.object({
 
 const update = Joi.object(fields).min(1);
 
-module.exports = { create, update };
+// The next date the screen showed: if it moved since (the job ran, or a second tap), nothing is recorded
+const run = Joi.object({ nextRun: Joi.date().iso() });
+
+module.exports = { create, update, run };

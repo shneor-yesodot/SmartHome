@@ -105,9 +105,62 @@ const create = async (userId, { account, chargeDate, ...data }) => {
   return transaction.populate(POPULATE);
 };
 
+const isAdjustment = (t) => t.description === ADJUSTMENT_NAME;
+
+/** The items of a purchase whose card line was linked, or null. Their total must stay the charge. */
+const linkedItems = async (userId, transaction) => {
+  if (!transaction.purchase) return null;
+  const items = await transactionRepository.findPurchase(userId, transaction.purchase);
+  return items.length > 1 && items.some((t) => t.importHash) ? items : null;
+};
+
+/**
+ * An item of a linked purchase changed by `delta`. The "difference" item takes it up,
+ * so the items still add up to what the card charged. Checked before anything is saved.
+ */
+const planAdjustment = (items, changed, delta) => {
+  const adjustment = items.find((t) => isAdjustment(t) && t.id !== changed.id);
+  const amount = round2((adjustment?.amount || 0) - delta);
+  if (amount < 0) {
+    throw ApiError.badRequest(`הפריטים יעלו על החיוב בכרטיס. הקטינו קודם פריט אחר ב-${round2(-amount)} ₪`);
+  }
+  return async () => {
+    if (adjustment && amount > 0) {
+      adjustment.amount = amount;
+      await adjustment.save();
+    } else if (adjustment) {
+      await remove(adjustment.user, adjustment.id, { rebalance: false });
+    } else if (amount > 0) {
+      const largest = items.reduce((a, b) => (b.amount > a.amount ? b : a));
+      await transactionRepository.create(changed.user, {
+        type: 'expense',
+        amount,
+        category: largest.category?._id || largest.category,
+        description: ADJUSTMENT_NAME,
+        merchant: changed.merchant,
+        date: changed.date,
+        purchase: changed.purchase,
+        source: changed.source,
+        ...(changed.account ? { account: changed.account._id || changed.account, chargeDate: changed.chargeDate } : {}),
+        ...(changed.receipt ? { receipt: changed.receipt } : {}),
+      });
+    }
+  };
+};
+
+const BALANCING_LINE = 'השורה הזו מאזנת את הפריטים מול החיוב בכרטיס. שנו את הפריטים עצמם, ואם הקנייה לא שלכם, מחקו את כל הפריטים';
+
 const update = async (userId, id, data) => {
   const current = await getById(userId, id);
   const type = data.type || current.type;
+  const linked = await linkedItems(userId, current);
+  let adjust = null;
+  if (linked) {
+    if (type !== 'expense') throw ApiError.conflict('פריט מקנייה שקושרה לחיוב בכרטיס חייב להישאר הוצאה');
+    const delta = data.amount === undefined ? 0 : round2(data.amount - current.amount);
+    if (delta && isAdjustment(current)) throw ApiError.conflict(BALANCING_LINE);
+    if (delta) adjust = planAdjustment(linked, current, delta);
+  }
   if (data.category || data.type) {
     await categoryManager.assertOwned(userId, data.category || current.category._id, type);
   }
@@ -124,24 +177,31 @@ const update = async (userId, id, data) => {
   }
   current.set(doc);
   await current.save();
+  if (adjust) await adjust();
   if (type === 'expense') triggerBudgetAlerts(userId, [current.category._id || current.category]);
   return getById(userId, id);
 };
 
-const remove = async (userId, id) => {
+async function remove(userId, id, { rebalance = true } = {}) {
   const transaction = await transactionRepository.findOneByUser(userId, id);
   if (!transaction) throw ApiError.notFound('העסקה לא נמצאה');
   const items = transaction.purchase ? await transactionRepository.findPurchase(userId, transaction.purchase) : [];
   const holder = items.find((t) => t.importHash && t.id === String(id));
-  const heir = items.find((t) => t.id !== String(id));
+  const heir = items.find((t) => t.id !== String(id) && !isAdjustment(t)) || items.find((t) => t.id !== String(id));
+
+  // The card still charged it: a deleted item's amount moves to the difference line
+  const linked = rebalance && (await linkedItems(userId, transaction));
+  if (linked && isAdjustment(transaction)) throw ApiError.conflict(BALANCING_LINE);
+  const adjust = linked ? planAdjustment(linked, transaction, -transaction.amount) : null;
 
   await transactionRepository.deleteByUser(userId, id);
+  if (adjust) await adjust();
   // The other items are still that statement line: importing the file again must not add it back
   if (holder && heir) {
     heir.importHash = holder.importHash;
     await heir.save();
   }
-};
+}
 
 /** A category of the user for an expense item, or "other" when none was chosen. */
 const expenseCategory = async (userId, id) =>

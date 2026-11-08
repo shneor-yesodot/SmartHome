@@ -46,8 +46,9 @@ const userSchema = new Schema(
     // Refresh token ids (jti), one active per logged-in device. Rotated ids stay
     // until they expire, marked `used`, so a replayed token can be recognized.
     sessions: { type: [{ jti: String, expiresAt: Date, used: Boolean, usedAt: Date, _id: false }], select: false, default: [] },
-    // E-mail verification code (stored hashed)
-    otp: { type: { hash: String, expiresAt: Date, attempts: Number }, select: false },
+    // E-mail verification code (stored hashed). Wrong guesses count per hour across codes,
+    // so asking for a new code does not buy more guesses
+    otp: { type: { hash: String, expiresAt: Date, attempts: Number, windowStart: Date }, select: false },
     // Password reset token (stored hashed)
     passwordReset: { type: { hash: String, expiresAt: Date }, select: false },
     // Authenticator app: encrypted secret, hashed one-time backup codes, last accepted time step
