@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Coins, Percent, TrendingDown, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
@@ -73,6 +73,22 @@ export default function Reports() {
           ) : (
             <>
               <MonthSummary summary={data.summary} period={period} />
+
+              <Card title={`הכנסות מול הוצאות - 12 חודשים עד ${period.label}`}>
+                <div dir="ltr" className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data.year} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                      <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="name" {...axisProps} interval="preserveStartEnd" minTickGap={4} />
+                      <YAxis {...axisProps} width={52} tickFormatter={(v) => v.toLocaleString('he-IL')} />
+                      <Tooltip content={<ChartTooltip />} labelFormatter={(_, payload) => payload?.[0]?.payload.label} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 13, paddingTop: 8 }} />
+                      <Line type="monotone" dataKey="income" name="הכנסות" stroke={CHART_COLORS.income} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="expense" name="הוצאות" stroke={CHART_COLORS.expense} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
 
               <Card title="הוצאות יומיות">
                 <div dir="ltr" className="h-[240px]">

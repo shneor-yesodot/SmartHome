@@ -42,11 +42,29 @@ const buildFilter = ({ type, category, account, chargeDate, source, from, to, se
   return filter;
 };
 
-/** Derives the product fields that are stored next to the raw input. */
-const normalize = (data) => {
+/** The spelling already in use for each product key, so one product keeps one name. */
+const knownProductNames = async (userId) => {
+  const names = new Map();
+  for (const name of await transactionRepository.productNames(userId)) {
+    const key = toProductKey(name);
+    if (!names.has(key)) names.set(key, name);
+  }
+  return names;
+};
+
+/**
+ * Derives the product fields that are stored next to the raw input. With `names`, a product
+ * already saved under another spelling ("2 ליטר חלב תנובה") takes that spelling.
+ */
+const normalize = (data, names) => {
   const doc = { ...data };
   if (doc.productName) {
     doc.productKey = toProductKey(doc.productName);
+    const known = names?.get(doc.productKey);
+    if (known && known !== doc.productName) {
+      if (doc.description === doc.productName) doc.description = known;
+      doc.productName = known;
+    }
     doc.quantity = doc.quantity || 1;
     doc.unitPrice = doc.unitPrice ?? round2(doc.amount / doc.quantity);
   } else if ('productName' in doc) {
@@ -100,7 +118,8 @@ const getById = async (userId, id) => {
 const create = async (userId, { account, chargeDate, ...data }) => {
   await categoryManager.assertOwned(userId, data.category, data.type);
   const charge = await accountManager.resolveCharge(userId, account, data.date, chargeDate);
-  const transaction = await transactionRepository.create(userId, { ...normalize(data), ...charge });
+  const names = data.productName ? await knownProductNames(userId) : null;
+  const transaction = await transactionRepository.create(userId, { ...normalize(data, names), ...charge });
   if (transaction.type === 'expense') triggerBudgetAlerts(userId, [transaction.category]);
   return transaction.populate(POPULATE);
 };
@@ -164,7 +183,8 @@ const update = async (userId, id, data) => {
   if (data.category || data.type) {
     await categoryManager.assertOwned(userId, data.category || current.category._id, type);
   }
-  const doc = normalize({ amount: current.amount, quantity: current.quantity, ...data });
+  const names = data.productName && data.productName !== current.productName ? await knownProductNames(userId) : null;
+  const doc = normalize({ amount: current.amount, quantity: current.quantity, ...data }, names);
   // The charge date follows the card and the purchase date, unless it was given explicitly
   const accountChanged = 'account' in data && String(data.account || '') !== String(current.account?._id || '');
   const dateChanged = data.date && new Date(data.date).getTime() !== current.date.getTime();
@@ -215,11 +235,13 @@ const expenseCategory = async (userId, id) =>
 const replaceWithItems = async (userId, original, rows, { source = original.source, extra = {} } = {}) => {
   const [first, ...rest] = rows;
   const before = original.toObject();
-  original.set(normalize({ ...first, category: await expenseCategory(userId, first.category), source, ...extra }));
+  const names = await knownProductNames(userId);
+  original.set(normalize({ ...first, category: await expenseCategory(userId, first.category), source, ...extra }, names));
   await original.save();
   try {
     const created = await bulkCreate(userId, rest, {
       source,
+      names,
       extra: { account: original.account, chargeDate: original.chargeDate, receipt: original.receipt, recurring: original.recurring, ...extra },
     });
     triggerBudgetAlerts(userId, [original.category]);
@@ -335,8 +357,9 @@ const getPurchase = async (userId, id) => {
  * Creates many transactions at once (Excel import, receipt lines).
  * Rows without a valid category fall back to the user's "other" category.
  */
-const bulkCreate = async (userId, rows, { source = 'import', extra = {} } = {}) => {
+const bulkCreate = async (userId, rows, { source = 'import', extra = {}, names: given } = {}) => {
   const categories = await categoryRepository.findAllByUser(userId);
+  const names = given || (rows.some((r) => r.productName) ? await knownProductNames(userId) : null);
   const byId = new Map(categories.map((c) => [c.id, c]));
   const fallbacks = {};
 
@@ -347,7 +370,7 @@ const bulkCreate = async (userId, rows, { source = 'import', extra = {} } = {}) 
       fallbacks[row.type] = fallbacks[row.type] || (await categoryManager.getFallback(userId, row.type));
       category = fallbacks[row.type];
     }
-    docs.push(normalize({ ...row, ...extra, category: category._id, source }));
+    docs.push(normalize({ ...row, ...extra, category: category._id, source }, names));
   }
 
   const created = await transactionRepository.createMany(userId, docs);
