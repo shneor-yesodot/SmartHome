@@ -122,10 +122,22 @@ class TransactionRepository extends BaseRepository {
       .exec();
   }
 
-  /** Itemised purchases (transactions that carry product details). */
-  findProductPurchases(userId, productKey) {
-    const filter = { type: 'expense', productKey: productKey || { $exists: true, $ne: null } };
+  /** Itemised purchases (transactions that carry product details), oldest first. */
+  findProductPurchases(userId) {
+    const filter = { type: 'expense', productName: { $exists: true, $ne: null } };
     return this.findAllByUser(userId, filter, { sort: { date: 1 }, populate: 'category', lean: true });
+  }
+
+  /** Every product name the user has saved, the most used first. */
+  async productNames(userId) {
+    const rows = await this.model
+      .aggregate([
+        { $match: { user: BaseRepository.toObjectId(userId), productName: { $type: 'string' } } },
+        { $group: { _id: '$productName', count: { $sum: 1 }, last: { $max: '$date' } } },
+        { $sort: { count: -1, last: -1 } },
+      ])
+      .exec();
+    return rows.map((r) => r._id);
   }
 }
 

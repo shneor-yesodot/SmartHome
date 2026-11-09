@@ -20,6 +20,16 @@ describe('text helpers', () => {
   it('builds the same key for differently formatted product names', () => {
     expect(toProductKey('  חלב   3% 1 ליטר ')).toBe(toProductKey('חלב 3% 1 ליטר'));
   });
+  it('ignores word order and how the unit is written', () => {
+    const key = toProductKey('חלב תנובה 2 ליטר');
+    ['2 ליטר חלב תנובה', '2ל׳ חלב תנובה', 'חלב תנובה 2 ל"'].forEach((name) => expect(toProductKey(name)).toBe(key));
+    expect(toProductKey('במבה 80 גרם')).toBe(toProductKey('80ג במבה'));
+    expect(toProductKey('עגבניות 1,5 ק"ג')).toBe(toProductKey('1.5 קילו עגבניות'));
+    expect(toProductKey(key)).toBe(key);
+  });
+  it('keeps different sizes apart', () => {
+    expect(toProductKey('חלב תנובה 1 ליטר')).not.toBe(toProductKey('חלב תנובה 2 ליטר'));
+  });
 });
 
 describe('request validation', () => {

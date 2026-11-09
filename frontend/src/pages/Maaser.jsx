@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CheckCircle2, HandHeart, History, Plus, Target, Trash2, Users, Wallet } from 'lucide-react';
+import { CheckCircle2, HandHeart, Plus, Target, Trash2, Wallet } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import PeriodNav from '../components/ui/PeriodNav';
 import StatCard from '../components/ui/StatCard';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import { ProgressBar } from '../components/ui/Progress';
 import { ErrorState, PageLoader } from '../components/ui/States';
 import { ChartTooltip, axisProps } from '../components/dashboard/IncomeExpenseChart';
 import MaaserSettings from '../components/maaser/MaaserSettings';
@@ -37,7 +36,6 @@ export default function Maaser() {
   if (error) return <ErrorState message={error.message} onRetry={reload} />;
   if (!data) return <PageLoader />;
 
-  const owed = data.target + Math.max(data.carryOver, 0);
   const done = data.remaining <= 0;
 
   const confirmDelete = async () => {
@@ -66,16 +64,9 @@ export default function Maaser() {
       </PageHeader>
 
       <div className={`space-y-6 ${loading ? 'opacity-60' : ''}`}>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <StatCard label="היעד החודש" value={formatMoney(data.target, { round: true })} icon={Target} footnote={targetText(data.settings, data.income)} />
           <StatCard label="ניתן החודש" value={formatMoney(data.given, { round: true })} icon={HandHeart} tone="success" footnote={`${data.donations.length} תרומות`} />
-          <StatCard
-            label="יתרה מחודשים קודמים"
-            value={formatMoney(Math.abs(data.carryOver), { round: true })}
-            icon={History}
-            tone={data.carryOver > 0 ? 'warning' : 'neutral'}
-            footnote={data.carryOver > 0 ? 'עוד לא ניתן מהחודשים הקודמים' : data.carryOver < 0 ? 'ניתן מראש בחודשים הקודמים' : 'אין יתרה פתוחה'}
-          />
           <StatCard
             label={done ? 'ניתן מעבר ליעד' : 'נשאר לתת'}
             value={formatMoney(Math.abs(data.remaining), { round: true })}
@@ -84,18 +75,6 @@ export default function Maaser() {
             footnote={done ? 'היעד הושלם, בעז״ה' : 'היעד החודש והיתרה מחודשים קודמים'}
           />
         </div>
-
-        {owed > 0 && (
-          <div className="card p-5">
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="font-semibold">התקדמות ב{data.period.label}</span>
-              <span className="tabular text-ink-muted">
-                {formatMoney(data.given, { round: true })} מתוך {formatMoney(owed, { round: true })}
-              </span>
-            </div>
-            <ProgressBar value={(data.given / owed) * 100} />
-          </div>
-        )}
 
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <Card title={`תרומות ב${data.period.label}`} icon={HandHeart} className="min-w-0">
@@ -122,26 +101,7 @@ export default function Maaser() {
             )}
           </Card>
 
-          <div className="space-y-6">
-            <Card title={`לפי נמען ב${data.period.label}`} icon={Users}>
-              {data.byRecipient.length === 0 ? (
-                <p className="py-2 text-sm text-ink-muted">אין עדיין נתונים.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {data.byRecipient.map((r) => (
-                    <li key={r.recipient} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{r.recipient}</span>
-                        <span className="text-xs text-ink-muted">{r.count} תרומות</span>
-                      </span>
-                      <span className="tabular shrink-0 font-semibold">{formatMoney(r.total, { round: true })}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-            <MaaserSettings key={JSON.stringify(data.settings)} settings={data.settings} onSaved={reload} />
-          </div>
+          <MaaserSettings key={JSON.stringify(data.settings)} settings={data.settings} onSaved={reload} />
         </div>
 
         <Card title="יעד מול נתינה - 12 חודשים">

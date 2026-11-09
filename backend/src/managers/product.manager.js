@@ -29,6 +29,17 @@ const merchantStats = (purchases) => {
     .sort((a, b) => a.lastPrice - b.lastPrice || a.avgPrice - b.avgPrice);
 };
 
+/** The spelling used most often; on a tie, the most recent one. Purchases are oldest first. */
+const commonName = (purchases) => {
+  const counts = new Map();
+  purchases.forEach((t) => counts.set(t.productName, (counts.get(t.productName) || 0) + 1));
+  let best = null;
+  counts.forEach((count, name) => {
+    if (!best || count >= counts.get(best)) best = name;
+  });
+  return best;
+};
+
 /** Summary card of a product, built from all of its purchases. */
 const summarize = (key, purchases) => {
   const prices = purchases.map(priceOf);
@@ -39,7 +50,7 @@ const summarize = (key, purchases) => {
 
   return {
     key,
-    name: last.productName,
+    name: commonName(purchases),
     category: last.category ? { name: last.category.name, color: last.category.color, icon: last.category.icon } : null,
     purchases: purchases.length,
     totalSpent: round2(purchases.reduce((s, t) => s + t.amount, 0)),
@@ -59,11 +70,13 @@ const summarize = (key, purchases) => {
   };
 };
 
+// The key is worked out from the name each time, so purchases saved before a smarter key still group together
 const groupByProduct = (purchases) => {
   const groups = new Map();
   purchases.forEach((t) => {
-    if (!groups.has(t.productKey)) groups.set(t.productKey, []);
-    groups.get(t.productKey).push(t);
+    const key = toProductKey(t.productName);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
   });
   return groups;
 };
@@ -98,7 +111,7 @@ const list = async (userId, { search, sort = 'recent' } = {}) => {
 
 const detail = async (userId, key) => {
   const productKey = toProductKey(key);
-  const purchases = await transactionRepository.findProductPurchases(userId, productKey);
+  const purchases = groupByProduct(await transactionRepository.findProductPurchases(userId)).get(productKey) || [];
   if (!purchases.length) throw ApiError.notFound('המוצר לא נמצא');
 
   return {

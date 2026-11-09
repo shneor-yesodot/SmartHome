@@ -2,6 +2,8 @@ const transactionRepository = require('../repositories/transaction.repository');
 const { periodOf, shiftPeriod, dayOfPeriod, describePeriod } = require('../utils/period');
 const { round2, percentOf, percentChange, totalsByType } = require('../utils/finance');
 
+const YEAR_MONTHS = 12;
+
 /** Groups transactions of one type by category, largest first. */
 const breakdownByCategory = (transactions, type) => {
   const groups = new Map();
@@ -75,10 +77,19 @@ const summarize = (transactions, totals) => {
 const monthly = async (userId, period) => {
   const prevPeriod = shiftPeriod(period, -1);
 
-  const [transactions, previousTransactions] = await Promise.all([
+  const yearPeriods = Array.from({ length: YEAR_MONTHS }, (_, i) => shiftPeriod(period, i - (YEAR_MONTHS - 1)));
+
+  const [transactions, previousTransactions, yearTransactions] = await Promise.all([
     transactionRepository.findInRange(userId, period.from, period.to, { populate: 'category account' }),
     transactionRepository.findInRange(userId, prevPeriod.from, prevPeriod.to, { populate: 'category' }),
+    transactionRepository.findInRange(userId, yearPeriods[0].from, period.to),
   ]);
+
+  // Income and expense of the twelve months ending with this one, oldest first
+  const year = yearPeriods.map((p) => {
+    const { income, expense } = totalsByType(yearTransactions.filter((t) => t.date >= p.from && t.date < p.to));
+    return { key: p.key, name: p.name, label: p.label, income, expense };
+  });
 
   const totals = withSavings(totalsByType(transactions));
   const previous = withSavings(totalsByType(previousTransactions));
@@ -125,6 +136,7 @@ const monthly = async (userId, period) => {
       savings: previous.savings > 0 ? percentChange(totals.savings, previous.savings) : null,
     },
     daily,
+    year,
     categories,
     incomeCategories: breakdownByCategory(transactions, 'income'),
     summary: summarize(transactions, totals),

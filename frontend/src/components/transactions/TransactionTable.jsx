@@ -3,7 +3,7 @@ import CategoryIcon from '../ui/CategoryIcon';
 import Badge from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { SOURCE_LABELS } from '../../constants/options';
-import { formatDate, formatMoney, formatTransactionAmount } from '../../utils/format';
+import { amountTone, formatDate, formatMoney, formatTransactionAmount } from '../../utils/format';
 import { formatDay } from '../../utils/hebrewDate';
 
 /** The date in the calendar being used; a Hebrew view keeps the Gregorian date next to it. */
@@ -31,7 +31,7 @@ function Meta({ t }) {
           {t.account.name}
         </span>
       )}
-      {t.source !== 'manual' && <Badge className="!px-2 !py-0.5">{SOURCE_LABELS[t.source]}</Badge>}
+      {t.source !== 'manual' && t.source !== 'import' && <Badge className="!px-2 !py-0.5">{SOURCE_LABELS[t.source]}</Badge>}
       {t.isRefund && <Badge className="!px-2 !py-0.5">זיכוי</Badge>}
       {t.purchase && <Badge className="!px-2 !py-0.5">פריט מקנייה</Badge>}
     </>
@@ -59,7 +59,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete, calen
                 <Meta t={t} />
               </span>
             </button>
-            <span className={`tabular shrink-0 text-sm font-bold ${t.type === 'income' ? 'text-brand-600' : ''}`}>{formatTransactionAmount(t)}</span>
+            <span className={`tabular shrink-0 text-sm font-bold ${amountTone(t)}`}>{formatTransactionAmount(t)}</span>
             <button className="icon-btn -me-2 shrink-0 hover:!bg-danger-50 hover:!text-danger-500" onClick={() => onDelete(t)} aria-label={`מחיקת ${t.description}`}>
               <Trash2 className="h-4 w-4" />
             </button>
@@ -100,7 +100,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete, calen
                   </span>
                 </td>
                 <td className="table-cell text-ink-soft">{t.merchant || <span className="text-ink-muted">-</span>}</td>
-                <td className={`table-cell tabular whitespace-nowrap font-semibold ${t.type === 'income' ? 'text-brand-600' : ''}`}>
+                <td className={`table-cell tabular whitespace-nowrap font-semibold ${amountTone(t)}`}>
                   {formatTransactionAmount(t)}
                 </td>
                 <td className="table-cell">

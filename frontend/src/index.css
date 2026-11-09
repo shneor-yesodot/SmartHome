@@ -76,6 +76,10 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* A dialog's own bottom padding, plus the home indicator when there is one */
+  .pb-safe-5 {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
   .main-with-nav {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom));
   }

@@ -281,6 +281,41 @@ describe('purchases made of items', () => {
   });
 });
 
+describe('product names', () => {
+  it('one product written two ways is saved and shown under one name', async () => {
+    const food = categoryId('סופר ומזון');
+    const first = await call('/transactions/basket', {
+      method: 'POST',
+      body: { merchant: 'מכולת השמות', date: '2026-05-03', items: [{ name: 'חלב טרי 2 ליטר', total: 12.9, category: food }, { name: 'לחם', total: 9, category: food }] },
+    });
+    expect(first.status).toBe(201);
+    const second = await call('/transactions', {
+      method: 'POST',
+      body: { type: 'expense', amount: 13.5, category: food, description: 'קנייה', date: '2026-05-10', merchant: 'סופר אחר', productName: '2 ל׳ חלב טרי' },
+    });
+    expect(second.body.data.productName).toBe('חלב טרי 2 ליטר');
+
+    const products = (await call('/products?search=' + encodeURIComponent('חלב טרי'))).body.data;
+    expect(products).toHaveLength(1);
+    expect(products[0]).toMatchObject({ name: 'חלב טרי 2 ליטר', purchases: 2, merchantsCount: 2 });
+    const detail = (await call(`/products/detail?key=${encodeURIComponent(products[0].key)}`)).body.data;
+    expect(detail.history).toHaveLength(2);
+  });
+});
+
+describe('yearly report', () => {
+  it('lists income and expense of the twelve months ending with the month shown', async () => {
+    const salary = categoryId('משכורת', 'income');
+    await call('/transactions', { method: 'POST', body: { type: 'income', amount: 7000, category: salary, description: 'משכורת', date: '2025-12-05' } });
+    const report = (await call('/reports/monthly?calendar=gregorian&date=2026-06-15')).body.data;
+    expect(report.year).toHaveLength(12);
+    expect(report.year[0].key).toBe('2025-07-01');
+    expect(report.year[11].key).toBe('2026-06-01');
+    expect(report.year.find((m) => m.key === '2025-12-01').income).toBeGreaterThanOrEqual(7000);
+    expect(report.year[11]).toEqual(expect.objectContaining({ income: expect.any(Number), expense: expect.any(Number), name: expect.any(String) }));
+  });
+});
+
 describe('standing orders', () => {
   const recurringManager = require('../src/managers/recurring.manager');
   const { startOfDay, addFrequency } = require('../src/utils/dateUtils');

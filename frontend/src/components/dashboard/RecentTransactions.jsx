@@ -3,7 +3,7 @@ import { Receipt } from 'lucide-react';
 import Card from '../ui/Card';
 import CategoryIcon from '../ui/CategoryIcon';
 import { EmptyState } from '../ui/States';
-import { formatDayMonth, formatTransactionAmount } from '../../utils/format';
+import { amountTone, formatDayMonth, formatTransactionAmount } from '../../utils/format';
 
 export default function RecentTransactions({ transactions, onAdd }) {
   return (
@@ -40,7 +40,7 @@ export default function RecentTransactions({ transactions, onAdd }) {
                 </p>
               </div>
               <div className="shrink-0 text-end">
-                <p className={`tabular text-sm font-semibold ${t.type === 'income' ? 'text-brand-600' : ''}`}>
+                <p className={`tabular text-sm font-semibold ${amountTone(t)}`}>
                   {formatTransactionAmount(t)}
                 </p>
                 <p className="text-xs text-ink-muted">{formatDayMonth(t.date)}</p>

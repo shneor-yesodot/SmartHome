@@ -22,6 +22,9 @@ export const formatSigned = (value, options) => {
 /** Signed amount of a transaction: income is positive, expense is negative. */
 export const formatTransactionAmount = (t) => formatSigned(t.type === 'income' ? t.amount : -t.amount);
 
+/** Text color of a transaction's amount: income green, expense red. */
+export const amountTone = (t) => (t.type === 'income' ? 'text-brand-600' : 'text-danger-500');
+
 export const formatPercent = (value) => `${Math.round(Number(value || 0))}%`;
 
 /** Signed change, e.g. "+12%" / "-4%". Returns null when there is nothing to compare with. */
