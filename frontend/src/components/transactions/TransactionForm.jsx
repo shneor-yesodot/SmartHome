@@ -195,7 +195,7 @@ function EditBody({ transaction, mode, onClose, onSaved, onSplit }) {
           </div>
 
           <Field label="תיאור">
-            <Input required maxLength={140} value={form.description} onChange={set('description')} placeholder="למשל: קנייה שבועית" />
+            <Input maxLength={140} value={form.description} onChange={set('description')} placeholder="לא חובה, למשל: קנייה שבועית" />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">

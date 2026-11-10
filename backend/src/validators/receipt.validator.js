@@ -9,7 +9,7 @@ const confirm = Joi.object({
   items: Joi.array()
     .items(
       Joi.object({
-        name: shortText(120).min(1).required().label('שם המוצר'),
+        name: shortText(120).allow('').default('').label('שם המוצר'),
         quantity: Joi.number().positive().max(100000).default(1).label('כמות'),
         total: money().required().label('סכום'),
         category: objectId().allow(null).label('קטגוריה'),

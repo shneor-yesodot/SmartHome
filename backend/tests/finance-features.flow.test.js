@@ -282,6 +282,27 @@ describe('purchases made of items', () => {
 });
 
 describe('product names', () => {
+  it('a description is optional: the store or the category names the transaction', async () => {
+    const food = categoryId('סופר ומזון');
+    const withStore = await call('/transactions', { method: 'POST', body: { type: 'expense', amount: 40, category: food, date: '2026-05-04', merchant: 'פיצוציה' } });
+    expect(withStore.status).toBe(201);
+    expect(withStore.body.data.description).toBe('פיצוציה');
+    const bare = await call('/transactions', { method: 'POST', body: { type: 'expense', amount: 15, category: food, date: '2026-05-04', description: '' } });
+    expect(bare.body.data.description).toBe('סופר ומזון');
+    const cleared = await call(`/transactions/${withStore.body.data.id}`, { method: 'PUT', body: { description: '' } });
+    expect(cleared.body.data.description).toBe('פיצוציה');
+
+    const basket = await call('/transactions/basket', {
+      method: 'POST',
+      body: { merchant: 'דוכן', date: '2026-05-04', items: [{ name: 'עגבניות', total: 9, category: food }, { name: '', total: 6, category: food }] },
+    });
+    expect(basket.status).toBe(201);
+    const items = (await call(`/transactions?search=${encodeURIComponent('דוכן')}`)).body.data;
+    const unnamed = items.find((t) => t.amount === 6);
+    expect(unnamed.description).toBe('דוכן');
+    expect(unnamed.productName).toBeFalsy();
+  });
+
   it('one product written two ways is saved and shown under one name', async () => {
     const food = categoryId('סופר ומזון');
     const first = await call('/transactions/basket', {

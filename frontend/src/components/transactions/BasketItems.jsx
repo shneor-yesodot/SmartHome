@@ -30,11 +30,10 @@ export default function BasketItems({ items, onChange, categories }) {
             </button>
           </div>
           <Input
-            required
             maxLength={120}
             value={item.name}
             onChange={(e) => update(item.key, 'name', e.target.value)}
-            placeholder="שם המוצר"
+            placeholder="שם המוצר (לא חובה)"
             aria-label="שם המוצר"
           />
           <div className="mt-2 grid grid-cols-[72px_104px_minmax(0,1fr)] gap-2">
