@@ -24,7 +24,7 @@ export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, 
   const add = () => setItems((list) => [...list, withKey({ name: '', quantity: 1, total: '', category: categories[0]?.id || null })]);
 
   const total = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
-  const valid = items.length > 0 && date && items.every((i) => i.name.trim() && Number(i.total) > 0 && Number(i.quantity) > 0);
+  const valid = items.length > 0 && date && items.every((i) => Number(i.total) > 0 && Number(i.quantity) > 0);
 
   const submit = (e) => {
     e.preventDefault();
@@ -86,7 +86,7 @@ export default function ReceiptReview({ receipt, previewUrl, saving, onConfirm, 
               {items.map((item) => (
                 <tr key={item.key}>
                   <td className="px-4 py-2">
-                    <Input required maxLength={120} value={item.name} onChange={(e) => update(item.key, 'name', e.target.value)} aria-label="שם המוצר" />
+                    <Input maxLength={120} value={item.name} onChange={(e) => update(item.key, 'name', e.target.value)} aria-label="שם המוצר" />
                   </td>
                   <td className="px-2 py-2">
                     <Input type="number" min="0.001" step="any" required value={item.quantity} onChange={(e) => update(item.key, 'quantity', e.target.value)} aria-label="כמות" />

@@ -282,6 +282,27 @@ describe('purchases made of items', () => {
 });
 
 describe('product names', () => {
+  it('a description is optional: the store or the category names the transaction', async () => {
+    const food = categoryId('סופר ומזון');
+    const withStore = await call('/transactions', { method: 'POST', body: { type: 'expense', amount: 40, category: food, date: '2026-05-04', merchant: 'פיצוציה' } });
+    expect(withStore.status).toBe(201);
+    expect(withStore.body.data.description).toBe('פיצוציה');
+    const bare = await call('/transactions', { method: 'POST', body: { type: 'expense', amount: 15, category: food, date: '2026-05-04', description: '' } });
+    expect(bare.body.data.description).toBe('סופר ומזון');
+    const cleared = await call(`/transactions/${withStore.body.data.id}`, { method: 'PUT', body: { description: '' } });
+    expect(cleared.body.data.description).toBe('פיצוציה');
+
+    const basket = await call('/transactions/basket', {
+      method: 'POST',
+      body: { merchant: 'דוכן', date: '2026-05-04', items: [{ name: 'עגבניות', total: 9, category: food }, { name: '', total: 6, category: food }] },
+    });
+    expect(basket.status).toBe(201);
+    const items = (await call(`/transactions?search=${encodeURIComponent('דוכן')}`)).body.data;
+    const unnamed = items.find((t) => t.amount === 6);
+    expect(unnamed.description).toBe('דוכן');
+    expect(unnamed.productName).toBeFalsy();
+  });
+
   it('one product written two ways is saved and shown under one name', async () => {
     const food = categoryId('סופר ומזון');
     const first = await call('/transactions/basket', {
@@ -475,7 +496,7 @@ describe('credit cards', () => {
   it('shows the split by card in the month report', async () => {
     const report = (await call('/reports/monthly?calendar=gregorian&date=2026-10-15')).body.data;
     const names = report.summary.byAccount.map((a) => a.name);
-    expect(names).toEqual(expect.arrayContaining(['ויזה', 'ללא אמצעי תשלום']));
+    expect(names).toEqual(expect.arrayContaining(['ויזה', 'ללא כרטיס או חשבון']));
   });
 
   it('keeps the transactions when a card is removed', async () => {
@@ -583,6 +604,15 @@ describe('statement import', () => {
   it('refuses a file that is not a statement', async () => {
     const { status } = await upload([['שם', 'גיל'], ['דנה', 30]]);
     expect(status).toBe(400);
+  });
+
+  it("recognizes the app's own template, so one import button can take it", async () => {
+    const { status, body } = await upload([
+      ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'בית עסק', 'מוצר', 'כמות'],
+      ['2026-05-01', 'הוצאה', 20, 'סופר ומזון', 'לחם', 'מאפייה', 'לחם', 1],
+    ]);
+    expect(status).toBe(400);
+    expect(body.details).toEqual({ format: 'smarthome-template' });
   });
 });
 

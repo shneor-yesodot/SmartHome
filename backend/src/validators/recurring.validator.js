@@ -8,7 +8,7 @@ const fields = {
   type: type().label('סוג'),
   amount: money().label('סכום'),
   category: objectId().label('קטגוריה'),
-  account: objectId().allow(null, '').label('אמצעי תשלום'),
+  account: objectId().allow(null, '').label('כרטיס או חשבון'),
   frequency: Joi.string().valid(...FREQUENCIES).label('תדירות'),
   startDate: Joi.date().iso().label('תאריך החיוב הבא'),
   isActive: Joi.boolean(),

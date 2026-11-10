@@ -120,6 +120,10 @@ const nearbyMatcher = async (userId, lines) => {
  * Lines that would count money twice start switched off, with the reason next to them.
  */
 const preview = async (userId, file) => {
+  // One import button takes both kinds of file: the app's template goes to the template import instead
+  if (statementService.isAppTemplate(file.buffer)) {
+    throw ApiError.badRequest('זה קובץ בתבנית של SmartHome, לא דף תנועות', { format: 'smarthome-template' });
+  }
   let lines;
   try {
     lines = statementService.parseStatement(file.buffer);

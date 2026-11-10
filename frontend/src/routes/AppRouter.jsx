@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './ProtectedRoute';
 import AppLayout from '../components/layout/AppLayout';
 import { PageLoader } from '../components/ui/States';
@@ -15,14 +15,9 @@ import OAuthCallback from '../pages/OAuthCallback';
 // Secondary screens are loaded on demand to keep the first load small
 const Transactions = lazy(() => import('../pages/Transactions'));
 const Cards = lazy(() => import('../pages/Cards'));
-const Products = lazy(() => import('../pages/Products'));
 const Reports = lazy(() => import('../pages/Reports'));
-const Budgets = lazy(() => import('../pages/Budgets'));
-const Goals = lazy(() => import('../pages/Goals'));
-const Recurring = lazy(() => import('../pages/Recurring'));
-const UploadReceipt = lazy(() => import('../pages/UploadReceipt'));
-const MyReceipts = lazy(() => import('../pages/MyReceipts'));
-const Maaser = lazy(() => import('../pages/Maaser'));
+const Plan = lazy(() => import('../pages/Plan'));
+const Receipts = lazy(() => import('../pages/Receipts'));
 const Settings = lazy(() => import('../pages/Settings'));
 
 export default function AppRouter() {
@@ -45,14 +40,16 @@ export default function AppRouter() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/cards" element={<Cards />} />
-            <Route path="/products" element={<Products />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/goals" element={<Goals />} />
-            <Route path="/maaser" element={<Maaser />} />
-            <Route path="/recurring" element={<Recurring />} />
-            <Route path="/receipts" element={<UploadReceipt />} />
-            <Route path="/my-receipts" element={<MyReceipts />} />
+            <Route path="/plan" element={<Plan />} />
+            <Route path="/receipts" element={<Receipts />} />
+            {/* Addresses of the screens that became tabs, for old bookmarks */}
+            <Route path="/budgets" element={<Navigate to="/plan" replace />} />
+            <Route path="/recurring" element={<Navigate to="/plan?tab=recurring" replace />} />
+            <Route path="/maaser" element={<Navigate to="/plan?tab=maaser" replace />} />
+            <Route path="/goals" element={<Navigate to="/plan?tab=goals" replace />} />
+            <Route path="/products" element={<Navigate to="/receipts?tab=products" replace />} />
+            <Route path="/my-receipts" element={<Navigate to="/receipts" replace />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

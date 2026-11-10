@@ -6,14 +6,14 @@ const fields = {
   type: type().label('סוג'),
   amount: money().label('סכום'),
   category: objectId().label('קטגוריה'),
-  description: shortText(140).min(1).label('תיאור'),
+  description: shortText(140).allow('').label('תיאור'),
   merchant: shortText(80).allow('').label('בית עסק'),
   date: Joi.date().iso().max('2100-01-01').label('תאריך'),
   notes: shortText(500).allow('').label('הערות'),
   productName: shortText(120).allow('').label('שם מוצר'),
   quantity: Joi.number().positive().max(100000).label('כמות'),
   unitPrice: Joi.number().min(0).precision(2).label('מחיר ליחידה'),
-  account: objectId().allow(null, '').label('אמצעי תשלום'),
+  account: objectId().allow(null, '').label('כרטיס או חשבון'),
   chargeDate: Joi.date().iso().max('2100-01-01').allow(null).label('תאריך חיוב'),
 };
 
@@ -22,7 +22,6 @@ const create = Joi.object({
   type: fields.type.required(),
   amount: fields.amount.required(),
   category: fields.category.required(),
-  description: fields.description.required(),
   date: fields.date.required(),
 });
 
@@ -49,7 +48,7 @@ const bulkCreate = Joi.object({
         type: type().required(),
         amount: money().required(),
         category: objectId().allow(null),
-        description: shortText(140).min(1).required(),
+        description: shortText(140).allow(''),
         merchant: shortText(80).allow(''),
         date: Joi.date().iso().required(),
         productName: shortText(120).allow(''),
@@ -63,7 +62,7 @@ const bulkCreate = Joi.object({
 });
 
 const purchaseItem = Joi.object({
-  name: shortText(120).min(1).required().label('שם המוצר'),
+  name: shortText(120).allow('').default('').label('שם המוצר'),
   quantity: fields.quantity.default(1),
   total: money().required().label('סכום'),
   category: objectId().allow(null).label('קטגוריה'),

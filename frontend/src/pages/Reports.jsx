@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BarChart3, Coins, Percent, TrendingDown, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
@@ -7,15 +7,15 @@ import PeriodNav from '../components/ui/PeriodNav';
 import StatCard from '../components/ui/StatCard';
 import { ProgressBar } from '../components/ui/Progress';
 import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
-import { ChartTooltip, axisProps } from '../components/dashboard/IncomeExpenseChart';
+import { ChartTooltip, axisProps } from '../components/ui/ChartTooltip';
 import { PriceChange } from '../components/products/ProductCard';
 import MonthSummary from '../components/reports/MonthSummary';
+import AiInsights from '../components/dashboard/AiInsights';
 import { useAuth } from '../context/AuthContext';
 import { useFetch } from '../hooks/useFetch';
 import { reportService } from '../services/report.service';
 import { CHART_COLORS } from '../constants/options';
 import { formatChange, formatMoney } from '../utils/format';
-import { dayNumber, formatDay } from '../utils/hebrewDate';
 
 const versusPrevious = (change) => {
   if (change === null) return 'אין נתוני השוואה';
@@ -32,7 +32,7 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="דוחות" subtitle="סיכום חודשי והשוואה לחודש הקודם">
+      <PageHeader title="דוחות" subtitle="סיכום חודשי, מגמה שנתית, והשוואה לחודש הקודם">
         <PeriodNav
           period={period}
           calendar={calendar}
@@ -77,28 +77,14 @@ export default function Reports() {
               <Card title={`הכנסות מול הוצאות - 12 חודשים עד ${period.label}`}>
                 <div dir="ltr" className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data.year} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                    <BarChart data={data.year} barGap={4} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
                       <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="4 4" vertical={false} />
                       <XAxis dataKey="name" {...axisProps} interval="preserveStartEnd" minTickGap={4} />
                       <YAxis {...axisProps} width={52} tickFormatter={(v) => v.toLocaleString('he-IL')} />
-                      <Tooltip content={<ChartTooltip />} labelFormatter={(_, payload) => payload?.[0]?.payload.label} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ fill: '#EDF8F2' }} labelFormatter={(_, payload) => payload?.[0]?.payload.label} />
                       <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 13, paddingTop: 8 }} />
-                      <Line type="monotone" dataKey="income" name="הכנסות" stroke={CHART_COLORS.income} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                      <Line type="monotone" dataKey="expense" name="הוצאות" stroke={CHART_COLORS.expense} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-
-              <Card title="הוצאות יומיות">
-                <div dir="ltr" className="h-[240px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.daily} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-                      <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="4 4" vertical={false} />
-                      <XAxis dataKey="day" {...axisProps} interval="preserveStartEnd" minTickGap={6} tickFormatter={(day) => dayNumber(day, period.calendar)} />
-                      <YAxis {...axisProps} width={52} tickFormatter={(v) => v.toLocaleString('he-IL')} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: '#EDF8F2' }} labelFormatter={(day) => formatDay(data.daily[day - 1].date, period.calendar)} />
-                      <Bar dataKey="expense" name="הוצאות" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                      <Bar dataKey="income" name="הכנסות" fill={CHART_COLORS.income} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                      <Bar dataKey="expense" name="הוצאות" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} maxBarSize={22} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -174,6 +160,8 @@ export default function Reports() {
                   </Card>
                 </div>
               </div>
+
+              <AiInsights />
             </>
           )}
         </div>

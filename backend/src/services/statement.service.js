@@ -207,6 +207,22 @@ const addFingerprints = (lines) => {
   });
 };
 
+// The app's own import template (excel.service): these columns never head a bank or card statement together
+const TEMPLATE_COLUMNS = ['סוג', 'קטגוריה', 'מוצר', 'כמות'];
+
+/** Whether the file is SmartHome's own Excel template rather than a statement. */
+const isAppTemplate = (buffer) => {
+  try {
+    const workbook = readWorkbook(buffer);
+    const first = workbook.Sheets[workbook.SheetNames[0]];
+    const [header = []] = XLSX.utils.sheet_to_json(first, { header: 1, raw: true, defval: '', blankrows: false });
+    const names = header.map(normalizeHeader);
+    return TEMPLATE_COLUMNS.every((c) => names.includes(c));
+  } catch {
+    return false;
+  }
+};
+
 /** Reads a whole file. Throws when no table of transactions can be found in it. */
 const parseStatement = (buffer) => {
   const workbook = readWorkbook(buffer);
@@ -267,4 +283,4 @@ const parseSummaryCategories = (buffer) => {
   throw new Error('no summary header found');
 };
 
-module.exports = { parseStatement, parseSummaryCategories, parseAmount, parseDate, isCardSettlement };
+module.exports = { parseStatement, parseSummaryCategories, parseAmount, parseDate, isCardSettlement, isAppTemplate };

@@ -52,7 +52,7 @@ const summarize = (transactions, totals) => {
   const accounts = new Map();
   for (const t of expenses) {
     const key = String(t.account?._id || 'none');
-    const row = accounts.get(key) || { accountId: key, name: t.account?.name || 'ללא אמצעי תשלום', color: t.account?.color || '#7C8B83', total: 0 };
+    const row = accounts.get(key) || { accountId: key, name: t.account?.name || 'ללא כרטיס או חשבון', color: t.account?.color || '#7C8B83', total: 0 };
     row.total = round2(row.total + t.amount);
     accounts.set(key, row);
   }

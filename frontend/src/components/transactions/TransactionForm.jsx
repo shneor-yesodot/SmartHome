@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, ScanLine, X } from 'lucide-react';
+import { useState } from 'react';
+import { ListPlus, Plus } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import TypeToggle from '../ui/TypeToggle';
@@ -9,19 +9,16 @@ import SplitForm from './SplitForm';
 import PaymentMatch from './PaymentMatch';
 import PurchaseItems from './PurchaseItems';
 import { useCategories } from '../../context/CategoriesContext';
-import { useToast } from '../../context/ToastContext';
 import { useAction } from '../../hooks/useAction';
 import { useFetch } from '../../hooks/useFetch';
 import { accountService } from '../../services/account.service';
 import { transactionService } from '../../services/transaction.service';
-import { receiptService } from '../../services/receipt.service';
 import { formatMoney, toInputDate, todayInput } from '../../utils/format';
 
-const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-const MAX_RECEIPT_MB = 8;
+const TITLES = { expense: 'הוצאה חדשה', income: 'הכנסה חדשה' };
 
-const toForm = (t) => ({
-  type: t?.type || 'expense',
+const toForm = (t, mode) => ({
+  type: t?.type || (mode === 'income' ? 'income' : 'expense'),
   amount: t?.amount ?? '',
   category: t?.category?.id || '',
   account: t?.account?.id || '',
@@ -33,17 +30,20 @@ const toForm = (t) => ({
   notes: t?.notes || '',
 });
 
-/** Create / edit a transaction. `transaction` is null when creating. */
-export default function TransactionForm({ open, transaction, onClose, onSaved }) {
+/**
+ * Create / edit a transaction. `transaction` is null when creating, and `mode` says what
+ * is being added: an expense or an income. Receipts have their own screen.
+ */
+export default function TransactionForm({ open, transaction, mode = 'expense', onClose, onSaved }) {
   return (
-    <Modal open={open} onClose={onClose} title={transaction ? 'עריכת עסקה' : 'עסקה חדשה'}>
+    <Modal open={open} onClose={onClose} title={transaction ? 'עריכת עסקה' : TITLES[mode]}>
       {/* The key resets the form state whenever a different transaction is opened */}
-      {open && <FormBody key={transaction?.id || 'new'} transaction={transaction} onClose={onClose} onSaved={onSaved} />}
+      {open && <FormBody key={transaction?.id || `new-${mode}`} transaction={transaction} mode={mode} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
 }
 
-function FormBody({ transaction, onClose, onSaved }) {
+function FormBody({ transaction, mode, onClose, onSaved }) {
   const [splitting, setSplitting] = useState(false);
   if (splitting) {
     return (
@@ -57,41 +57,26 @@ function FormBody({ transaction, onClose, onSaved }) {
       />
     );
   }
-  return <EditBody transaction={transaction} onClose={onClose} onSaved={onSaved} onSplit={() => setSplitting(true)} />;
+  return <EditBody transaction={transaction} mode={mode} onClose={onClose} onSaved={onSaved} onSplit={() => setSplitting(true)} />;
 }
 
-function EditBody({ transaction, onClose, onSaved, onSplit }) {
+function EditBody({ transaction, mode, onClose, onSaved, onSplit }) {
   const { byType } = useCategories();
   const { data: accounts } = useFetch(accountService.list, []);
-  const toast = useToast();
   const { run, pending } = useAction();
-  const [form, setForm] = useState(() => toForm(transaction));
+  const [form, setForm] = useState(() => toForm(transaction, mode));
   const [showProduct, setShowProduct] = useState(Boolean(transaction?.productName));
 
   // A new expense can hold several products; each one is saved as its own transaction
   const [items, setItems] = useState([]);
   const [payment, setPayment] = useState(null); // an imported statement line these items replace
   const [purchaseSize, setPurchaseSize] = useState(0); // items bought together with the one being edited
-  const [receipt, setReceipt] = useState(null); // scanned in this dialog, not saved yet
-  const [scanning, setScanning] = useState(false);
-  const fileRef = useRef(null);
-  const savedRef = useRef(false);
-  const receiptRef = useRef(null);
-  receiptRef.current = receipt;
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const categories = byType(form.type);
   const defaultCategory = form.category || (categories.find((c) => c.name === 'אוכל' || c.name === 'סופר ומזון') || categories[0])?.id || '';
   const canAddProducts = !transaction && form.type === 'expense';
   const basket = items.length > 0;
-
-  // A receipt scanned here but never saved is removed when the dialog closes
-  useEffect(
-    () => () => {
-      if (receiptRef.current && !savedRef.current) receiptService.remove(receiptRef.current.id).catch(() => {});
-    },
-    []
-  );
 
   /** The first click turns what was typed so far into product 1 and adds product 2. */
   const addProduct = () => {
@@ -109,38 +94,14 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
 
   /** Back to a single product (typed by hand) - its details return to the regular fields. */
   const changeItems = (next) => {
-    if (next.length === 0) return dropReceipt();
-    if (next.length === 1 && !receipt) {
+    if (next.length === 0) return setItems([]);
+    if (next.length === 1) {
       const [only] = next;
       setForm((f) => ({ ...f, amount: only.total, description: only.name || f.description, category: only.category || f.category }));
       setItems([]);
       return;
     }
     setItems(next);
-  };
-
-  const pickReceipt = (file) => {
-    if (!file) return;
-    if (!RECEIPT_TYPES.includes(file.type)) return toast.error('ניתן להעלות תמונה (JPG, PNG, WEBP) או קובץ PDF בלבד');
-    if (file.size > MAX_RECEIPT_MB * 1024 * 1024) return toast.error(`הקובץ גדול מדי (עד ${MAX_RECEIPT_MB}MB)`);
-    scanReceipt(file);
-  };
-
-  const scanReceipt = async (file) => {
-    setScanning(true);
-    const { ok, result } = await run(() => receiptService.scan(file));
-    setScanning(false);
-    if (!ok) return;
-    if (receipt) receiptService.remove(receipt.id).catch(() => {});
-    setReceipt(result);
-    setForm((f) => ({ ...f, merchant: result.merchant || f.merchant, date: toInputDate(result.purchaseDate) || f.date }));
-    setItems(result.items.map((i) => newItem({ name: i.name, quantity: i.quantity, total: i.total, category: i.category || defaultCategory })));
-  };
-
-  const dropReceipt = () => {
-    receiptService.remove(receipt.id).catch(() => {});
-    setReceipt(null);
-    setItems([]);
   };
 
   const submitBasket = async () => {
@@ -151,11 +112,10 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
       items: items.map((i) => ({ name: i.name.trim(), quantity: Number(i.quantity) || 1, total: Number(i.total), category: i.category || null })),
     };
     const { ok } = await run(
-      () => (receipt ? receiptService.confirm(receipt.id, payload) : transactionService.createBasket({ ...payload, notes: form.notes, account: form.account || null })),
+      () => transactionService.createBasket({ ...payload, notes: form.notes, account: form.account || null }),
       payment ? `נשמרו ${items.length} מוצרים במקום שורת החיוב` : `נשמרו ${items.length} מוצרים כעסקאות`
     );
     if (ok) {
-      savedRef.current = true;
       onSaved();
       onClose();
     }
@@ -197,7 +157,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
     </Field>
   );
   const accountField = (
-    <Field label="אמצעי תשלום">
+    <Field label="כרטיס או חשבון">
       <Select value={form.account} onChange={set('account')}>
         <option value="">לא צוין</option>
         {accounts?.map((a) => (
@@ -212,44 +172,8 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       {transaction?.purchase && <PurchaseItems transaction={transaction} onLoad={setPurchaseSize} />}
-      {!basket && <TypeToggle value={form.type} onChange={(type) => setForm((f) => ({ ...f, type, category: '' }))} />}
-
-      {canAddProducts && (
-        <div className="flex justify-end">
-          <input
-            ref={fileRef}
-            type="file"
-            accept={RECEIPT_TYPES.join(',')}
-            hidden
-            onChange={(e) => {
-              pickReceipt(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-          <Button variant="secondary" size="sm" icon={ScanLine} loading={scanning} disabled={scanning} onClick={() => fileRef.current.click()}>
-            {receipt ? 'קבלה אחרת' : 'העלאת קבלה'}
-          </Button>
-        </div>
-      )}
-
-      {scanning && (
-        <p role="status" className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          קוראים את הקבלה: בית העסק, התאריך וכל אחד מהמוצרים. זה לוקח כמה שניות.
-        </p>
-      )}
-
-      {receipt && (
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 text-sm">
-          <p className="min-w-0 text-brand-700">
-            <b>זוהו {receipt.items.length} מוצרים מהקבלה.</b> בדקו ותקנו לפני השמירה.
-            {receipt.engine === 'demo' && <span className="block text-xs text-warn-600">מצב הדגמה: אין מפתח Gemini בשרת, ולכן מוצגים מוצרים לדוגמה.</span>}
-          </p>
-          <button type="button" className="icon-btn shrink-0" onClick={dropReceipt} aria-label="ביטול הקבלה">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {/* The type is chosen by the button that opened the dialog; editing can still correct it */}
+      {transaction && <TypeToggle value={form.type} onChange={(type) => setForm((f) => ({ ...f, type, category: '' }))} />}
 
       {basket ? (
         <>
@@ -257,7 +181,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
             {merchantField}
             {dateField}
           </div>
-          {!receipt && !payment && accountField}
+          {!payment && accountField}
           <BasketItems items={items} onChange={changeItems} categories={categories} />
           <PaymentMatch date={form.date} total={basketTotal(items)} merchant={form.merchant} value={payment} onChange={setPayment} />
         </>
@@ -271,7 +195,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
           </div>
 
           <Field label="תיאור">
-            <Input required maxLength={140} value={form.description} onChange={set('description')} placeholder="למשל: קנייה שבועית" />
+            <Input maxLength={140} value={form.description} onChange={set('description')} placeholder="לא חובה, למשל: קנייה שבועית" />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -292,7 +216,7 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
 
           {accountField}
 
-          {form.type === 'expense' && (
+          {transaction && form.type === 'expense' && (
             <div className="rounded-xl border border-line p-3.5">
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
                 <input type="checkbox" className="h-4 w-4 accent-brand-500" checked={showProduct} onChange={(e) => setShowProduct(e.target.checked)} />
@@ -315,8 +239,8 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
 
       {canAddProducts && (
         <div className="flex items-center justify-between gap-3">
-          <Button variant="secondary" size="sm" icon={Plus} onClick={addProduct}>
-            מוצר נוסף
+          <Button variant="secondary" size="sm" icon={basket ? Plus : ListPlus} onClick={addProduct}>
+            {basket ? 'מוצר נוסף' : 'פירוט לפי מוצרים'}
           </Button>
           {basket && (
             <p className="text-sm text-ink-soft">
@@ -326,11 +250,9 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
         </div>
       )}
 
-      {!receipt && (
-        <Field label="הערות">
-          <Input maxLength={500} value={form.notes} onChange={set('notes')} placeholder="לא חובה" />
-        </Field>
-      )}
+      <Field label="הערות">
+        <Input maxLength={500} value={form.notes} onChange={set('notes')} placeholder="לא חובה" />
+      </Field>
 
       <div className="flex justify-end gap-2 pt-1">
         {transaction?.type === 'expense' && (!transaction.purchase || purchaseSize === 1) && (
@@ -341,8 +263,8 @@ function EditBody({ transaction, onClose, onSaved, onSplit }) {
         <Button variant="secondary" onClick={onClose}>
           ביטול
         </Button>
-        <Button type="submit" loading={pending && !scanning} disabled={scanning}>
-          {transaction ? 'שמירת שינויים' : basket ? `שמירת ${items.length} מוצרים` : 'הוספת עסקה'}
+        <Button type="submit" loading={pending}>
+          {transaction ? 'שמירת שינויים' : basket ? `שמירת ${items.length} מוצרים` : form.type === 'income' ? 'הוספת הכנסה' : 'הוספת הוצאה'}
         </Button>
       </div>
     </form>

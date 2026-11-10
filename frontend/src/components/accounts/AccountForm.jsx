@@ -9,7 +9,7 @@ import { ACCOUNT_KIND_LABELS, COLORS } from '../../constants/options';
 
 export default function AccountForm({ open, account, onClose, onSaved }) {
   return (
-    <Modal open={open} onClose={onClose} title={account ? 'עריכת אמצעי תשלום' : 'אמצעי תשלום חדש'}>
+    <Modal open={open} onClose={onClose} title={account ? 'עריכת כרטיס או חשבון' : 'כרטיס או חשבון חדש'}>
       {open && <FormBody key={account?.id || 'new'} account={account} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );

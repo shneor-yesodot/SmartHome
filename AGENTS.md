@@ -22,6 +22,9 @@ SmartHome is a household finance app: a React + Vite frontend (`frontend/`) and 
 - Concurrency: one-shot transitions are claimed atomically, never read-then-write. A receipt is claimed by `receiptRepository.claim`, a standing-order occurrence by `recurringRepository.claimRun` (the job and "run now" both use it), and a Sheets sync by the in-process `syncing` set. Rows created from the sheet carry `sheetKey`, so a retried sync does not create them twice.
 - `SmartHome.exe` (source `launcher/SmartHome.cs`, built by `launcher/build.ps1`): the double-click local start. It sets `HOST=127.0.0.1`, `PORT=5180`, `FRONTEND_DIR` and `STOP_WITH_LAUNCHER`; the server stops cleanly when its stdin closes. Rebuild and commit the exe whenever the source changes.
 - Root `Dockerfile` + `render.yaml`: one container where the API also serves the built frontend (`FRONTEND_DIR`).
+- Screens: six in the menu (`constants/nav.js`). "תכנון" (`pages/Plan.jsx`) and "קבלות ומוצרים" (`pages/Receipts.jsx`) are `TabbedPage`s that show older screens as tabs (`?tab=`); `PageHeader` hides its title inside a tab (`EmbeddedPage`). Old addresses (`/budgets`, `/products`…) redirect. Settings open from the user button in the top bar.
+- Adding: `AddButtons` (expense / income / receipt) on every screen; the receipt goes to the receipts screen, the only receipt flow. One import button (`ImportFileModal`): the server answers a file in the app's own template with `details.format = 'smarthome-template'` (`statementService.isAppTemplate`), and the dialog switches to the template import.
+- The calendar (Gregorian / Hebrew) is a setting (`ProfileCard`); only Reports keeps a toggle to compare.
 - `frontend/public/sw.js`: caches only the app's own files. It must never cache `/api`.
 
 ## Working Notes

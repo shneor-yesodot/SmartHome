@@ -95,7 +95,7 @@
 | שיטה | נתיב | תיאור |
 |---|---|---|
 | GET | `/transactions` | רשימה עם סינון ודפדוף. פרמטרים: `page, limit, type, category, account, chargeDate, source, from, to, search` |
-| POST | `/transactions` | יצירה: `type, amount, category, description, date, merchant?, notes?, productName?, quantity?, account?, chargeDate?`. בכרטיס עם יום חיוב, `chargeDate` מחושב אם לא נשלח |
+| POST | `/transactions` | יצירה: `type, amount, category, date, description?, merchant?, notes?, productName?, quantity?, account?, chargeDate?`. בלי תיאור, העסקה נקראת לפי המוצר, בית העסק או הקטגוריה (כך גם פריט בלי שם בקנייה או בקבלה). בכרטיס עם יום חיוב, `chargeDate` מחושב אם לא נשלח |
 | GET | `/transactions/:id` | עסקה בודדת |
 | PUT | `/transactions/:id` | עדכון. בפריט מקנייה שקושרה לחיוב בכרטיס, שינוי סכום עובר לשורת "הפרש מול החיוב בכרטיס" כך שהסכום הכולל נשאר החיוב (400 אם הפריטים יעלו עליו). את שורת ההפרש עצמה, או סוג הפריט, אי אפשר לשנות (409) |
 | DELETE | `/transactions/:id` | מחיקה. בקנייה שקושרה לחיוב, סכום הפריט שנמחק עובר לשורת ההפרש. שורת ההפרש נמחקת רק כשהיא אחרונה (409 לפני כן) |

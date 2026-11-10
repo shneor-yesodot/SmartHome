@@ -9,11 +9,10 @@ import Segmented from '../components/ui/Segmented';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
 import AccountForm from '../components/accounts/AccountForm';
-import ImportStatementModal from '../components/transactions/ImportStatementModal';
+import ImportFileModal from '../components/transactions/ImportFileModal';
 import TransactionForm from '../components/transactions/TransactionForm';
 import TransactionTable from '../components/transactions/TransactionTable';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
 import { useAction } from '../hooks/useAction';
 import { useFetch } from '../hooks/useFetch';
 import { accountService } from '../services/account.service';
@@ -182,8 +181,7 @@ function AccountDetail({ account, period, calendar, version, onChanged }) {
 
 export default function Cards() {
   const { user } = useAuth();
-  const toast = useToast();
-  const [calendar, setCalendar] = useState(user?.calendar || 'gregorian');
+  const calendar = user?.calendar || 'gregorian';
   const [anchor, setAnchor] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(undefined);
@@ -199,7 +197,7 @@ export default function Cards() {
   const selected = accounts.find((a) => a.id === selectedId) || accounts[0];
 
   const confirmDelete = async () => {
-    const { ok } = await run(() => accountService.remove(deleting.id), 'אמצעי התשלום נמחק. העסקאות שלו נשמרו');
+    const { ok } = await run(() => accountService.remove(deleting.id), 'נמחק. העסקאות שלו נשמרו');
     if (ok) {
       setDeleting(null);
       refresh();
@@ -212,17 +210,13 @@ export default function Cards() {
         <PeriodNav
           period={data?.period}
           calendar={calendar}
-          onCalendarChange={(value) => {
-            setAnchor(null);
-            setCalendar(value);
-          }}
           onAnchorChange={setAnchor}
         />
         <Button variant="secondary" icon={FileUp} onClick={() => setImportOpen(true)}>
-          יבוא דף
+          ייבוא קובץ
         </Button>
         <Button icon={Plus} onClick={() => setEditing(null)}>
-          הוספה
+          כרטיס או חשבון חדש
         </Button>
       </PageHeader>
 
@@ -238,7 +232,7 @@ export default function Cards() {
             text="הוסיפו כרטיס אשראי או חשבון בנק. אפשר גם לייבא דף פירוט אשראי, והכרטיסים ייפתחו מעצמם."
             action={
               <Button icon={Plus} onClick={() => setEditing(null)}>
-                הוספה
+                כרטיס או חשבון חדש
               </Button>
             }
           />
@@ -252,7 +246,7 @@ export default function Cards() {
             </div>
             {data.unassigned.count > 0 && (
               <div className="flex gap-2">
-                <dt className="text-ink-muted">הוצאות בלי אמצעי תשלום</dt>
+                <dt className="text-ink-muted">הוצאות בלי כרטיס או חשבון</dt>
                 <dd className="font-semibold">
                   {formatMoney(data.unassigned.total)} ({data.unassigned.count})
                 </dd>
@@ -279,17 +273,10 @@ export default function Cards() {
       )}
 
       <AccountForm open={editing !== undefined} account={editing || null} onClose={() => setEditing(undefined)} onSaved={refresh} />
-      <ImportStatementModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={({ created, skipped }) => {
-          toast.success(skipped ? `יובאו ${created} תנועות, ${skipped} כבר היו במערכת` : `יובאו ${created} תנועות`);
-          refresh();
-        }}
-      />
+      <ImportFileModal open={importOpen} onClose={() => setImportOpen(false)} onImported={refresh} />
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="מחיקת אמצעי תשלום"
+        title="מחיקת כרטיס או חשבון"
         message={`למחוק את "${deleting?.name}"? העסקאות שלו יישארו, רק בלי שיוך לכרטיס.`}
         loading={pending}
         onConfirm={confirmDelete}

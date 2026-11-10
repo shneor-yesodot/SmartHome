@@ -60,7 +60,7 @@ export default function MonthSummary({ summary, period }) {
       {summary.byAccount?.length > 0 && (
         <div className="mt-6">
           <Section
-            title="לפי אמצעי תשלום"
+            title="לפי כרטיס או חשבון"
             total={totals.expense}
             tone="text-danger-500"
             rows={summary.byAccount.map((a) => ({ key: a.accountId, name: a.name, color: a.color, total: a.total }))}

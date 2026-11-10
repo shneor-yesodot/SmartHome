@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input, Select } from '../ui/Field';
-import Segmented from '../ui/Segmented';
 import { useAuth } from '../../context/AuthContext';
 import { useCategories } from '../../context/CategoriesContext';
 import { useFetch } from '../../hooks/useFetch';
 import { accountService } from '../../services/account.service';
 import { reportService } from '../../services/report.service';
-import { CALENDAR_OPTIONS } from '../../constants/options';
 
 const isoDay = (date) => date.slice(0, 10);
 const MONTHS_BACK = 36;
@@ -17,7 +15,7 @@ export const EMPTY_FILTERS = { search: '', type: '', category: '', account: '', 
 export default function TransactionFilters({ filters, onChange }) {
   const { user } = useAuth();
   const { categories } = useCategories();
-  const [calendar, setCalendar] = useState(user?.calendar || 'gregorian');
+  const calendar = user?.calendar || 'gregorian';
   const [open, setOpen] = useState(false);
   const set = (field) => (e) => onChange({ ...filters, [field]: e.target.value });
   const visibleCategories = filters.type ? categories.filter((c) => c.type === filters.type) : categories;
@@ -58,8 +56,8 @@ export default function TransactionFilters({ filters, onChange }) {
           </option>
         ))}
       </Select>
-      <Select value={filters.account} onChange={set('account')} aria-label="אמצעי תשלום">
-        <option value="">כל אמצעי התשלום</option>
+      <Select value={filters.account} onChange={set('account')} aria-label="כרטיס או חשבון">
+        <option value="">כל הכרטיסים והחשבונות</option>
         {accounts?.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}
@@ -67,7 +65,6 @@ export default function TransactionFilters({ filters, onChange }) {
         ))}
       </Select>
       <div className="flex min-w-0 gap-2">
-        <Segmented label="לוח שנה" options={CALENDAR_OPTIONS} value={calendar} onChange={setCalendar} />
         <Select className="min-w-0 flex-1" value={month} onChange={(e) => pickMonth(e.target.value)} aria-label="חודש">
           <option value="">כל החודשים</option>
           {periods?.map((p) => (

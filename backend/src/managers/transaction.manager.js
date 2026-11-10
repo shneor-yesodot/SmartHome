@@ -115,8 +115,12 @@ const getById = async (userId, id) => {
   return transaction;
 };
 
-const create = async (userId, { account, chargeDate, ...data }) => {
-  await categoryManager.assertOwned(userId, data.category, data.type);
+/** A description is optional: without one, the product, the store or the category names the transaction. */
+const describe = (row, categoryName) => String(row.description || '').trim() || row.productName || row.merchant || categoryName;
+
+const create = async (userId, { account, chargeDate, ...input }) => {
+  const category = await categoryManager.assertOwned(userId, input.category, input.type);
+  const data = { ...input, description: describe(input, category.name) };
   const charge = await accountManager.resolveCharge(userId, account, data.date, chargeDate);
   const names = data.productName ? await knownProductNames(userId) : null;
   const transaction = await transactionRepository.create(userId, { ...normalize(data, names), ...charge });
@@ -183,6 +187,9 @@ const update = async (userId, id, data) => {
   if (data.category || data.type) {
     await categoryManager.assertOwned(userId, data.category || current.category._id, type);
   }
+  if ('description' in data && !String(data.description).trim()) {
+    data.description = describe({ ...data, productName: data.productName ?? current.productName, merchant: data.merchant ?? current.merchant }, current.category.name);
+  }
   const names = data.productName && data.productName !== current.productName ? await knownProductNames(userId) : null;
   const doc = normalize({ amount: current.amount, quantity: current.quantity, ...data }, names);
   // The charge date follows the card and the purchase date, unless it was given explicitly
@@ -224,8 +231,7 @@ async function remove(userId, id, { rebalance = true } = {}) {
 }
 
 /** A category of the user for an expense item, or "other" when none was chosen. */
-const expenseCategory = async (userId, id) =>
-  id ? (await categoryManager.assertOwned(userId, id, 'expense'))._id : (await categoryManager.getFallback(userId, 'expense'))._id;
+const expenseCategory = async (userId, id) => (id ? categoryManager.assertOwned(userId, id, 'expense') : categoryManager.getFallback(userId, 'expense'));
 
 /**
  * Turns one transaction, usually a statement line, into items whose total equals it.
@@ -236,7 +242,8 @@ const replaceWithItems = async (userId, original, rows, { source = original.sour
   const [first, ...rest] = rows;
   const before = original.toObject();
   const names = await knownProductNames(userId);
-  original.set(normalize({ ...first, category: await expenseCategory(userId, first.category), source, ...extra }, names));
+  const category = await expenseCategory(userId, first.category);
+  original.set(normalize({ ...first, description: describe(first, category.name), category: category._id, source, ...extra }, names));
   await original.save();
   try {
     const created = await bulkCreate(userId, rest, {
@@ -370,7 +377,7 @@ const bulkCreate = async (userId, rows, { source = 'import', extra = {}, names: 
       fallbacks[row.type] = fallbacks[row.type] || (await categoryManager.getFallback(userId, row.type));
       category = fallbacks[row.type];
     }
-    docs.push(normalize({ ...row, ...extra, category: category._id, source }, names));
+    docs.push(normalize({ ...row, ...extra, description: describe(row, category.name), category: category._id, source }, names));
   }
 
   const created = await transactionRepository.createMany(userId, docs);
@@ -427,8 +434,8 @@ const itemsToRows = ({ merchant, date, notes, items }, { group = items.length > 
     type: 'expense',
     amount: item.total,
     category: item.category,
-    description: item.name,
-    productName: item.name,
+    description: item.name || '',
+    productName: item.name || undefined,
     quantity: item.quantity,
     unitPrice: round2(item.total / item.quantity),
     merchant,

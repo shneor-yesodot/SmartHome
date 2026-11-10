@@ -8,7 +8,7 @@ import PeriodNav from '../components/ui/PeriodNav';
 import StatCard from '../components/ui/StatCard';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { ErrorState, PageLoader } from '../components/ui/States';
-import { ChartTooltip, axisProps } from '../components/dashboard/IncomeExpenseChart';
+import { ChartTooltip, axisProps } from '../components/ui/ChartTooltip';
 import MaaserSettings from '../components/maaser/MaaserSettings';
 import DonationForm from '../components/maaser/DonationForm';
 import { useAuth } from '../context/AuthContext';
@@ -25,7 +25,7 @@ const targetText = (s, income) =>
 
 export default function Maaser() {
   const { user } = useAuth();
-  const [calendar, setCalendar] = useState(user?.calendar || 'gregorian');
+  const calendar = user?.calendar || 'gregorian';
   const [anchor, setAnchor] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
@@ -52,10 +52,6 @@ export default function Maaser() {
         <PeriodNav
           period={data.period}
           calendar={calendar}
-          onCalendarChange={(value) => {
-            setAnchor(null);
-            setCalendar(value);
-          }}
           onAnchorChange={setAnchor}
         />
         <Button icon={Plus} onClick={() => setFormOpen(true)}>

@@ -1,5 +1,5 @@
-import { useLocation } from 'react-router-dom';
-import { LogOut, Menu, User } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { LogOut, Menu, Settings } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { titleForPath } from '../../constants/nav';
 import LiveClock from './LiveClock';
@@ -19,14 +19,20 @@ export default function Topbar({ onMenu }) {
 
       <div className="flex min-w-0 items-center gap-3">
         <LiveClock />
-        <div className="hidden max-w-[220px] items-center sm:flex gap-2 rounded-full bg-brand-50 py-1 pe-1 ps-4">
-          <span className="truncate text-sm text-ink-soft" dir="ltr" title={user?.email}>
+        {/* The account and its settings: profile, security, categories, cards, Google Sheets */}
+        <Link
+          to="/settings"
+          title="הגדרות"
+          aria-label="הגדרות"
+          className="flex max-w-[220px] items-center gap-2 rounded-full bg-brand-50 py-1 pe-1 transition-colors hover:bg-brand-100 sm:ps-4"
+        >
+          <span className="hidden truncate text-sm text-ink-soft sm:block" dir="ltr">
             {user?.email}
           </span>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white">
-            <User className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
           </span>
-        </div>
+        </Link>
         <button className="icon-btn" onClick={logout} aria-label="התנתקות" title="התנתקות">
           <LogOut className="h-5 w-5" />
         </button>

@@ -12,7 +12,7 @@ export default function BudgetStatus({ budgets }) {
       title="מצב התקציבים החודש"
       icon={Target}
       action={
-        <Link to="/budgets" className="text-sm font-semibold text-brand-600 hover:underline">
+        <Link to="/plan" className="text-sm font-semibold text-brand-600 hover:underline">
           ניהול תקציבים
         </Link>
       }

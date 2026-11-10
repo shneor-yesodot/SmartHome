@@ -3,10 +3,12 @@ import { UserRound } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Switch from '../ui/Switch';
+import Segmented from '../ui/Segmented';
 import { Field, Input } from '../ui/Field';
 import { useAuth } from '../../context/AuthContext';
 import { useAction } from '../../hooks/useAction';
 import { authService } from '../../services/auth.service';
+import { CALENDAR_OPTIONS } from '../../constants/options';
 
 const NOTIFICATIONS = [
   { key: 'budgetAlerts', label: 'התראות תקציב', text: 'מייל כשמתקרבים לתקרת התקציב או חורגים ממנה' },
@@ -24,7 +26,7 @@ export default function ProfileCard() {
   };
 
   return (
-    <Card title="פרופיל והתראות" icon={UserRound}>
+    <Card title="פרופיל והעדפות" icon={UserRound}>
       <form
         className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
         onSubmit={(e) => {
@@ -44,6 +46,19 @@ export default function ProfileCard() {
       </form>
 
       <ul className="mt-6 divide-y divide-line border-t border-line">
+        <li className="flex flex-wrap items-center justify-between gap-4 py-4">
+          <div>
+            <p className="text-sm font-semibold">לוח שנה</p>
+            <p className="text-sm text-ink-muted">לפיו מחולקים החודשים בכל המסכים: תקציבים, מעשרות, כרטיסים ודוחות</p>
+          </div>
+          <Segmented
+            label="לוח שנה"
+            options={CALENDAR_OPTIONS}
+            value={user.calendar || 'gregorian'}
+            disabled={pending}
+            onChange={(calendar) => save({ calendar }, 'לוח השנה עודכן')}
+          />
+        </li>
         {NOTIFICATIONS.map(({ key, label, text }) => (
           <li key={key} className="flex items-center justify-between gap-4 py-4">
             <div>
