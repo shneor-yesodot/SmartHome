@@ -16,6 +16,7 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -39,7 +40,7 @@ namespace SmartHome
     internal sealed class LauncherForm : Form
     {
         private const int Port = 5180;
-        private const string NodeVersion = "22.12.0";
+        private const string NodeVersion = "22.23.4";
         private static readonly string AppUrl = "http://localhost:" + Port;
         private static readonly string HealthUrl = "http://127.0.0.1:" + Port + "/api/health";
 
@@ -167,7 +168,7 @@ namespace SmartHome
                 try
                 {
                     string candidate = Path.Combine(dir.Trim().Trim('"'), "node.exe");
-                    if (dir.Trim().Length > 0 && File.Exists(candidate) && NodeMajor(candidate) >= 18) return candidate;
+                    if (dir.Trim().Length > 0 && File.Exists(candidate) && IsSupported(InstalledVersion(candidate))) return candidate;
                 }
                 catch (ArgumentException) { }
             }
@@ -190,7 +191,13 @@ namespace SmartHome
             return local;
         }
 
-        private static int NodeMajor(string node)
+        /** What the project's tools accept (ESLint 10): Node 20.19+, 22.13+ or 24+. Older ones get a fresh copy. */
+        private static bool IsSupported(Version v)
+        {
+            return v.Major >= 24 || (v.Major == 22 && v.Minor >= 13) || (v.Major == 20 && v.Minor >= 19);
+        }
+
+        private static Version InstalledVersion(string node)
         {
             try
             {
@@ -199,10 +206,10 @@ namespace SmartHome
                 {
                     string version = p.StandardOutput.ReadToEnd().Trim().TrimStart('v');
                     p.WaitForExit(5000);
-                    return int.Parse(version.Split('.')[0]);
+                    return new Version(version);
                 }
             }
-            catch { return 0; }
+            catch { return new Version(0, 0); }
         }
 
         /** npm install, only when the package list changed since the last time. */
@@ -316,6 +323,8 @@ namespace SmartHome
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
             };
             PrepareEnvironment(info, node);
             using (var p = new Process { StartInfo = info })
@@ -330,10 +339,12 @@ namespace SmartHome
             }
         }
 
-        /** Scripts that npm runs look for node next to it. */
+        /** Scripts that npm runs look for node next to it. Output goes to a plain log file, so no colors. */
         private static void PrepareEnvironment(ProcessStartInfo info, string node)
         {
             info.EnvironmentVariables["PATH"] = Path.GetDirectoryName(node) + ";" + Environment.GetEnvironmentVariable("PATH");
+            info.EnvironmentVariables["NO_COLOR"] = "1";
+            info.EnvironmentVariables["FORCE_COLOR"] = "0";
         }
 
         private static bool IsRunning()
@@ -396,9 +407,13 @@ namespace SmartHome
             catch (InvalidOperationException) { }
         }
 
+        // Terminal color and cursor codes; some tools print them even when asked not to
+        private static readonly Regex AnsiCodes = new Regex(@"\x1B\[[0-9;?]*[A-Za-z]", RegexOptions.Compiled);
+
         private readonly object logLock = new object();
         private void Log(string line)
         {
+            line = AnsiCodes.Replace(line, "");
             lock (logLock)
             {
                 if (log != null) log.WriteLine(line);
