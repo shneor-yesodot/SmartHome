@@ -22,7 +22,6 @@ const normalize = (err) => {
   return null;
 };
 
-// eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, _next) => {
   const known = normalize(err);
   if (!known) logger.error(`${req.method} ${req.originalUrl}`, err);
