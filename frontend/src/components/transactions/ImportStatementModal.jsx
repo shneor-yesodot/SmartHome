@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
@@ -9,6 +9,9 @@ import { useFetch } from '../../hooks/useFetch';
 import { useCategories } from '../../context/CategoriesContext';
 import { accountService } from '../../services/account.service';
 import { importService } from '../../services/import.service';
+import { transactionService } from '../../services/transaction.service';
+import { useToast } from '../../context/ToastContext';
+import { downloadBlob } from '../../utils/download';
 import { formatDate, formatMoney } from '../../utils/format';
 
 const FLAGS = {
@@ -31,8 +34,10 @@ const suggestionText = ({ itemCount, total, merchant, diff }) =>
   `קרוב ל-${itemCount} פריטים שרשמתם${merchant ? ` ב${merchant}` : ''} (${formatMoney(total)}, הפרש ${formatMoney(Math.abs(diff))}). אם זו אותה קנייה, ההפרש יירשם בפריטים וההוצאה תיספר פעם אחת`;
 
 /** Choose a statement -> review each line (the risky ones start switched off) -> save. */
-export default function ImportStatementModal({ open, onClose, onImported }) {
+export default function ImportStatementModal({ open, onClose, onImported, onTemplate }) {
   const inputRef = useRef(null);
+  const toast = useToast();
+  const [reading, setReading] = useState(false);
   const { byType } = useCategories();
   const { data: accounts } = useFetch(accountService.list, []);
   const { run, pending } = useAction();
@@ -51,11 +56,28 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const { ok, result } = await run(() => importService.preview(file));
-    if (ok) {
+    setReading(true);
+    try {
+      const result = await importService.preview(file);
       setPreview(result);
       setRows(result.rows);
+    } catch (err) {
+      // A file in the app's own template is not a statement: it is read as one row per transaction
+      if (err.details?.format === 'smarthome-template' && onTemplate) {
+        try {
+          onTemplate(await transactionService.previewImport(file));
+        } catch (templateError) {
+          toast.error(templateError.message);
+        }
+      } else toast.error(err.message);
+    } finally {
+      setReading(false);
     }
+  };
+
+  const downloadTemplate = async () => {
+    const { ok, result } = await run(transactionService.downloadTemplate);
+    if (ok) downloadBlob(result, 'smarthome-import-template.xlsx');
   };
 
   const patch = (rowNumber, change) => setRows((list) => list.map((r) => (r.row === rowNumber ? { ...r, ...change } : r)));
@@ -80,7 +102,7 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
     <Modal
       open={open}
       onClose={close}
-      title="יבוא דף בנק או אשראי"
+      title="ייבוא קובץ"
       size={preview ? 'xl' : 'md'}
       footer={
         preview && (
@@ -89,7 +111,7 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
               קובץ אחר
             </Button>
             <Button loading={pending} disabled={!selected.length} onClick={confirm}>
-              יבוא {selected.length} תנועות
+              ייבוא {selected.length} תנועות
             </Button>
           </>
         )
@@ -98,18 +120,26 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
       <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.html,.htm" hidden onChange={chooseFile} />
 
       {!preview ? (
-        <button
-          type="button"
-          className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/50 px-6 py-10 text-center transition-colors hover:border-brand-400"
-          onClick={() => inputRef.current.click()}
-          disabled={pending}
-        >
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-card">
-            {pending ? <Upload className="h-7 w-7 animate-pulse" /> : <FileSpreadsheet className="h-7 w-7" />}
-          </span>
-          <span className="font-semibold">{pending ? 'קוראים את הקובץ' : 'בחירת דף עו״ש או פירוט אשראי'}</span>
-          <span className="text-sm text-ink-muted">הקובץ שהורדתם מאתר הבנק או חברת האשראי (Excel או CSV). לפני השמירה תוכלו לבדוק כל שורה.</span>
-        </button>
+        <div className="space-y-3">
+          <button
+            type="button"
+            className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/50 px-6 py-10 text-center transition-colors hover:border-brand-400"
+            onClick={() => inputRef.current.click()}
+            disabled={reading}
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-card">
+              {reading ? <Upload className="h-7 w-7 animate-pulse" /> : <FileSpreadsheet className="h-7 w-7" />}
+            </span>
+            <span className="font-semibold">{reading ? 'קוראים את הקובץ' : 'בחירת קובץ'}</span>
+            <span className="text-sm text-ink-muted">
+              דף עו״ש או פירוט אשראי שהורדתם מאתר הבנק או חברת האשראי, או קובץ Excel בתבנית של SmartHome. לפני השמירה תוכלו לבדוק כל שורה.
+            </span>
+          </button>
+          <button type="button" className="btn btn-ghost w-full" onClick={downloadTemplate} disabled={pending}>
+            <Download className="h-4 w-4" />
+            הורדת תבנית Excel לרישום ידני
+          </button>
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -156,7 +186,7 @@ export default function ImportStatementModal({ open, onClose, onImported }) {
                     checked={r.include && !locked}
                     disabled={locked}
                     onChange={(e) => patch(r.row, { include: e.target.checked })}
-                    aria-label={`יבוא ${r.description}`}
+                    aria-label={`ייבוא ${r.description}`}
                   />
                   <div className="min-w-0">
                     <p className={`truncate text-sm font-medium ${r.include && !locked ? '' : 'text-ink-muted'}`}>{r.description}</p>

@@ -10,7 +10,7 @@ const list = (userId) => accountRepository.findAllByUser(userId, {}, { sort: { i
 
 const getById = async (userId, id) => {
   const account = await accountRepository.findOneByUser(userId, id);
-  if (!account) throw ApiError.notFound('אמצעי התשלום לא נמצא');
+  if (!account) throw ApiError.notFound('הכרטיס או החשבון לא נמצא');
   return account;
 };
 
@@ -18,14 +18,14 @@ const create = (userId, data) => accountRepository.create(userId, data);
 
 const update = async (userId, id, data) => {
   const account = await accountRepository.updateByUser(userId, id, data);
-  if (!account) throw ApiError.notFound('אמצעי התשלום לא נמצא');
+  if (!account) throw ApiError.notFound('הכרטיס או החשבון לא נמצא');
   return account;
 };
 
 /** Removing a card keeps its transactions and standing orders; they just stop pointing to it. */
 const remove = async (userId, id) => {
   const account = await accountRepository.deleteByUser(userId, id);
-  if (!account) throw ApiError.notFound('אמצעי התשלום לא נמצא');
+  if (!account) throw ApiError.notFound('הכרטיס או החשבון לא נמצא');
   await transactionRepository.model.updateMany({ user: userId, account: id }, { $unset: { account: 1, chargeDate: 1 } });
   await recurringRepository.model.updateMany({ user: userId, account: id }, { $unset: { account: 1 } });
 };

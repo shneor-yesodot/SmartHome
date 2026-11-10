@@ -53,7 +53,7 @@ export default function CategoryManager() {
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" hidden aria-label="קובץ סיכום חודשי" onChange={chooseFile} />
           <Button size="sm" variant="secondary" icon={FileUp} loading={pending && !importing && !deleting} onClick={() => fileRef.current.click()}>
-            יבוא מקובץ סיכום
+            ייבוא מקובץ סיכום
           </Button>
           <Button size="sm" icon={Plus} onClick={() => setEditing(null)}>
             קטגוריה חדשה
@@ -96,14 +96,14 @@ export default function CategoryManager() {
       <Modal
         open={Boolean(importing)}
         onClose={() => setImporting(null)}
-        title="יבוא קטגוריות"
+        title="ייבוא קטגוריות"
         footer={
           <>
             <Button variant="secondary" onClick={() => setImporting(null)}>
               ביטול
             </Button>
             <Button loading={pending} disabled={!importing?.expense.length && !importing?.income.length} onClick={confirmImport}>
-              יבוא
+              ייבוא
             </Button>
           </>
         }

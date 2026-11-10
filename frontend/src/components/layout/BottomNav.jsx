@@ -12,7 +12,7 @@ export default function BottomNav({ onMenu }) {
     <nav aria-label="ניווט מהיר" className="pb-safe fixed inset-x-0 bottom-0 z-20 flex items-center border-t border-line bg-white lg:hidden">
       <NavLink to="/" end className={linkClass}>
         <LayoutGrid className="h-5 w-5" />
-        דשבורד
+        ראשי
       </NavLink>
       <NavLink to="/transactions" className={linkClass}>
         <ArrowLeftRight className="h-5 w-5" />

@@ -11,7 +11,7 @@ export default function NotFound() {
         text="ייתכן שהקישור שגוי או שהעמוד הוסר."
         action={
           <Link to="/" className="btn btn-primary">
-            חזרה לדשבורד
+            חזרה למסך הראשי
           </Link>
         }
       />

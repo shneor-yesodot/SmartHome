@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, FileUp, Landmark, Plus, Receipt } from 'lucide-react';
+import { Download, FileUp, Receipt } from 'lucide-react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import Pagination from '../components/ui/Pagination';
@@ -9,12 +9,11 @@ import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
 import TransactionFilters, { EMPTY_FILTERS } from '../components/transactions/TransactionFilters';
 import TransactionTable from '../components/transactions/TransactionTable';
 import TransactionForm from '../components/transactions/TransactionForm';
-import ImportExcelModal from '../components/transactions/ImportExcelModal';
-import ImportStatementModal from '../components/transactions/ImportStatementModal';
+import ImportFileModal from '../components/transactions/ImportFileModal';
+import AddButtons from '../components/transactions/AddButtons';
 import { useFetch } from '../hooks/useFetch';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAction } from '../hooks/useAction';
-import { useToast } from '../context/ToastContext';
 import { transactionService } from '../services/transaction.service';
 import { downloadBlob } from '../utils/download';
 import { formatMoney, todayInput } from '../utils/format';
@@ -22,13 +21,12 @@ import { formatMoney, todayInput } from '../utils/format';
 const PAGE_SIZE = 15;
 
 export default function Transactions() {
-  const toast = useToast();
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(undefined); // undefined = closed, null = new
+  const [mode, setMode] = useState('expense'); // what a new one is: expense or income
   const [deleting, setDeleting] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [statementOpen, setStatementOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { run, pending } = useAction();
 
@@ -39,9 +37,16 @@ export default function Transactions() {
   // Any change of filters returns to the first page
   useEffect(() => setPage(1), [queryKey]);
 
-  // The + button on phones and the app-icon shortcut open a new transaction right away
+  const add = (kind) => {
+    setMode(kind);
+    setEditing(null);
+  };
+
+  // The + button on phones and the app-icon shortcut open a new expense right away (?new=income for an income)
   useEffect(() => {
-    if (searchParams.get('new')) {
+    const kind = searchParams.get('new');
+    if (kind) {
+      setMode(kind === 'income' ? 'income' : 'expense');
       setEditing(null);
       setSearchParams({}, { replace: true });
     }
@@ -72,18 +77,13 @@ export default function Transactions() {
   return (
     <>
       <PageHeader title="עסקאות" subtitle="כל ההכנסות וההוצאות של משק הבית">
-        <Button variant="secondary" icon={Landmark} onClick={() => setStatementOpen(true)}>
-          יבוא דף בנק / אשראי
+        <Button variant="ghost" icon={Download} className="hidden sm:inline-flex" onClick={exportExcel} disabled={pending || !items.length}>
+          ייצוא
         </Button>
-        <Button variant="secondary" icon={FileUp} className="hidden sm:inline-flex" onClick={() => setImportOpen(true)}>
-          יבוא Excel
+        <Button variant="secondary" icon={FileUp} onClick={() => setImportOpen(true)}>
+          ייבוא קובץ
         </Button>
-        <Button variant="secondary" icon={Download} className="hidden sm:inline-flex" onClick={exportExcel} disabled={pending || !items.length}>
-          יצוא Excel
-        </Button>
-        <Button icon={Plus} onClick={() => setEditing(null)}>
-          עסקה חדשה
-        </Button>
+        <AddButtons onAdd={add} />
       </PageHeader>
 
       <TransactionFilters filters={filters} onChange={setFilters} />
@@ -115,12 +115,12 @@ export default function Transactions() {
             <EmptyState
               icon={Receipt}
               title={isFiltered ? 'לא נמצאו עסקאות שמתאימות לסינון' : 'עדיין אין עסקאות'}
-              text={isFiltered ? 'נסו לשנות את החיפוש או לנקות את הסינון.' : 'הוסיפו עסקה ידנית, ייבאו קובץ Excel או העלו קבלה.'}
+              text={isFiltered ? 'נסו לשנות את החיפוש או לנקות את הסינון.' : 'הוסיפו הוצאה או הכנסה, ייבאו דף מהבנק או העלו קבלה.'}
               action={
                 !isFiltered && (
-                  <Button icon={Plus} onClick={() => setEditing(null)}>
-                    עסקה חדשה
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <AddButtons onAdd={add} />
+                  </div>
                 )
               }
             />
@@ -133,24 +133,8 @@ export default function Transactions() {
         </div>
       )}
 
-      <TransactionForm open={editing !== undefined} transaction={editing || null} onClose={() => setEditing(undefined)} onSaved={reload} />
-      <ImportExcelModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={(count) => {
-          toast.success(`יובאו ${count} עסקאות`);
-          reload();
-        }}
-      />
-      <ImportStatementModal
-        open={statementOpen}
-        onClose={() => setStatementOpen(false)}
-        onImported={({ created, linked, skipped }) => {
-          const parts = [`יובאו ${created} תנועות`, linked && `${linked} קושרו לפריטים`, skipped && `${skipped} כבר היו במערכת`];
-          toast.success(parts.filter(Boolean).join(', '));
-          reload();
-        }}
-      />
+      <TransactionForm open={editing !== undefined} transaction={editing || null} mode={mode} onClose={() => setEditing(undefined)} onSaved={reload} />
+      <ImportFileModal open={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />
       <ConfirmDialog
         open={Boolean(deleting)}
         title="מחיקת עסקה"

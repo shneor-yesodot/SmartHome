@@ -475,7 +475,7 @@ describe('credit cards', () => {
   it('shows the split by card in the month report', async () => {
     const report = (await call('/reports/monthly?calendar=gregorian&date=2026-10-15')).body.data;
     const names = report.summary.byAccount.map((a) => a.name);
-    expect(names).toEqual(expect.arrayContaining(['ויזה', 'ללא אמצעי תשלום']));
+    expect(names).toEqual(expect.arrayContaining(['ויזה', 'ללא כרטיס או חשבון']));
   });
 
   it('keeps the transactions when a card is removed', async () => {
@@ -583,6 +583,15 @@ describe('statement import', () => {
   it('refuses a file that is not a statement', async () => {
     const { status } = await upload([['שם', 'גיל'], ['דנה', 30]]);
     expect(status).toBe(400);
+  });
+
+  it("recognizes the app's own template, so one import button can take it", async () => {
+    const { status, body } = await upload([
+      ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'בית עסק', 'מוצר', 'כמות'],
+      ['2026-05-01', 'הוצאה', 20, 'סופר ומזון', 'לחם', 'מאפייה', 'לחם', 1],
+    ]);
+    expect(status).toBe(400);
+    expect(body.details).toEqual({ format: 'smarthome-template' });
   });
 });
 

@@ -1,22 +1,24 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, FileText, Image, Receipt, ScanLine } from 'lucide-react';
-import PageHeader from '../components/ui/PageHeader';
-import Badge from '../components/ui/Badge';
-import Pagination from '../components/ui/Pagination';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
-import ReceiptViewer from '../components/receipts/ReceiptViewer';
-import { useFetch } from '../hooks/useFetch';
-import { useAction } from '../hooks/useAction';
-import { receiptService } from '../services/receipt.service';
-import { formatDate, formatMoney } from '../utils/format';
+import { ChevronLeft, FileText, Image, Receipt } from 'lucide-react';
+import Badge from '../ui/Badge';
+import Pagination from '../ui/Pagination';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { EmptyState, ErrorState, PageLoader } from '../ui/States';
+import ReceiptViewer from './ReceiptViewer';
+import { useFetch } from '../../hooks/useFetch';
+import { useAction } from '../../hooks/useAction';
+import { receiptService } from '../../services/receipt.service';
+import { formatDate, formatMoney } from '../../utils/format';
 
 const PAGE_SIZE = 20;
 
-export default function MyReceipts() {
+/**
+ * Every uploaded receipt, with its original file. A receipt still waiting for review
+ * opens back in the review (`onResume`); `refreshKey` reloads the list after a save.
+ */
+export default function ReceiptList({ onResume, refreshKey }) {
   const [page, setPage] = useState(1);
-  const { data, loading, error, reload } = useFetch(() => receiptService.list({ page, limit: PAGE_SIZE }), [page]);
+  const { data, loading, error, reload } = useFetch(() => receiptService.list({ page, limit: PAGE_SIZE }), [page, refreshKey]);
   const [viewing, setViewing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const { run, pending } = useAction();
@@ -37,26 +39,15 @@ export default function MyReceipts() {
     else reload();
   };
 
-  const upload = (
-    <Link to="/receipts" className="btn btn-primary">
-      <ScanLine className="h-4 w-4" />
-      העלאת קבלה
-    </Link>
-  );
-
   return (
     <>
-      <PageHeader title="הקבלות שלי" subtitle="כל הקבלות שהעליתם, עם הקובץ המקורי והמוצרים שנשמרו מהן">
-        {upload}
-      </PageHeader>
-
+      <h2 className="mb-3 text-lg font-bold">הקבלות שלי</h2>
       <div className="card overflow-hidden">
         {receipts.length === 0 ? (
           <EmptyState
             icon={Receipt}
             title="עדיין לא הועלו קבלות"
-            text="מצלמים קבלה או חשבונית, וכל מוצר בה נרשם כעסקה נפרדת. הקבלות יופיעו כאן."
-            action={upload}
+            text="הקבלות שתעלו יופיעו כאן, עם הקובץ המקורי והמוצרים שנשמרו מהן."
           />
         ) : (
           <>
@@ -67,7 +58,7 @@ export default function MyReceipts() {
                   <li key={r.id}>
                     <button
                       type="button"
-                      onClick={() => setViewing(r)}
+                      onClick={() => (r.status !== 'confirmed' && onResume ? onResume(r) : setViewing(r))}
                       className="flex w-full items-center gap-4 px-4 py-3.5 text-start transition-colors hover:bg-surface/70 sm:px-5"
                     >
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -81,7 +72,7 @@ export default function MyReceipts() {
                       </div>
                       <div className="shrink-0 text-end">
                         <p className="tabular font-bold">{formatMoney(r.total)}</p>
-                        {r.status === 'confirmed' ? <Badge tone="success">נשמרה</Badge> : <Badge tone="warning">ממתינה</Badge>}
+                        {r.status === 'confirmed' ? <Badge tone="success">נשמרה</Badge> : <Badge tone="warning">ממתינה לבדיקה</Badge>}
                       </div>
                       <ChevronLeft className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
                     </button>

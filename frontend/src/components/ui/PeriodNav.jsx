@@ -11,14 +11,15 @@ export const periodAnchor = (period, direction) =>
 
 /**
  * Month switcher in either calendar. The server works out the month range
- * (`period` from the response); this only moves the anchor day.
+ * (`period` from the response); this only moves the anchor day. The calendar
+ * comes from the settings; only screens that compare calendars pass `onCalendarChange`.
  */
 export default function PeriodNav({ period, calendar, onCalendarChange, onAnchorChange }) {
   const isCurrent = !period || new Date(period.end).getTime() + DAY_MS > Date.now();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Segmented label="לוח שנה" options={CALENDAR_OPTIONS} value={calendar} onChange={onCalendarChange} />
+      {onCalendarChange && <Segmented label="לוח שנה" options={CALENDAR_OPTIONS} value={calendar} onChange={onCalendarChange} />}
       <div className="card flex items-center gap-1 p-1">
         <button className="icon-btn" disabled={!period} onClick={() => onAnchorChange(periodAnchor(period, -1))} aria-label="החודש הקודם">
           <ChevronRight className="h-5 w-5" />

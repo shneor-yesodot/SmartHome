@@ -3,7 +3,7 @@ import { BadgeCheck } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Badge from '../ui/Badge';
 import { ErrorState, PageLoader } from '../ui/States';
-import { ChartTooltip, axisProps } from '../dashboard/IncomeExpenseChart';
+import { ChartTooltip, axisProps } from '../ui/ChartTooltip';
 import { useFetch } from '../../hooks/useFetch';
 import { productService } from '../../services/product.service';
 import { CHART_COLORS } from '../../constants/options';

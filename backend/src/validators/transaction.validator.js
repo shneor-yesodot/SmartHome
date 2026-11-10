@@ -13,7 +13,7 @@ const fields = {
   productName: shortText(120).allow('').label('שם מוצר'),
   quantity: Joi.number().positive().max(100000).label('כמות'),
   unitPrice: Joi.number().min(0).precision(2).label('מחיר ליחידה'),
-  account: objectId().allow(null, '').label('אמצעי תשלום'),
+  account: objectId().allow(null, '').label('כרטיס או חשבון'),
   chargeDate: Joi.date().iso().max('2100-01-01').allow(null).label('תאריך חיוב'),
 };
 

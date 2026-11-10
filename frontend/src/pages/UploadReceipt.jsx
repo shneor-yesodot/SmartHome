@@ -1,22 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, FileText } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
-import PageHeader from '../components/ui/PageHeader';
+import { CheckCircle2 } from 'lucide-react';
 import ReceiptDropzone from '../components/receipts/ReceiptDropzone';
 import ReceiptReview from '../components/receipts/ReceiptReview';
-import { useFetch } from '../hooks/useFetch';
+import ReceiptList from '../components/receipts/ReceiptList';
 import { useAction } from '../hooks/useAction';
 import { useToast } from '../context/ToastContext';
 import { receiptService } from '../services/receipt.service';
-import { formatDate, formatMoney } from '../utils/format';
 
 export default function UploadReceipt() {
   const toast = useToast();
   const { run, pending } = useAction();
-  const history = useFetch(receiptService.recent, []);
+  const [saves, setSaves] = useState(0); // reloads the list after a save
   const [receipt, setReceipt] = useState(null); // scanned, waiting for review
   const [previewUrl, setPreviewUrl] = useState(null);
   const [savedCount, setSavedCount] = useState(null);
@@ -44,7 +39,7 @@ export default function UploadReceipt() {
       setSavedCount({ created: result.created, linked: result.linked });
       setReceipt(null);
       setPreviewUrl(null);
-      history.reload();
+      setSaves((n) => n + 1);
     }
   };
 
@@ -55,12 +50,10 @@ export default function UploadReceipt() {
 
   return (
     <>
-      <PageHeader title="העלאת קבלה" subtitle="מצלמים קבלה או חשבונית, וכל מוצר בה נרשם כעסקה נפרדת" />
-
       {receipt ? (
         <ReceiptReview receipt={receipt} previewUrl={previewUrl} saving={pending} onConfirm={confirm} onCancel={cancel} />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="space-y-6">
           <div className="space-y-4">
             {savedCount !== null && (
               <div className="card flex flex-wrap items-center gap-4 border-brand-200 bg-brand-50 p-5">
@@ -73,7 +66,7 @@ export default function UploadReceipt() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Link to="/products" className="btn btn-secondary btn-sm">
+                  <Link to="/receipts?tab=products" className="btn btn-secondary btn-sm">
                     לקטלוג המוצרים
                   </Link>
                   <Link to="/transactions" className="btn btn-secondary btn-sm">
@@ -84,43 +77,8 @@ export default function UploadReceipt() {
             )}
             <ReceiptDropzone scanning={pending} onFile={scan} onInvalid={toast.error} />
           </div>
+          <ReceiptList refreshKey={saves} onResume={setReceipt} />
 
-          <Card
-            title="קבלות אחרונות"
-            icon={FileText}
-            action={
-              <Link to="/my-receipts" className="text-sm font-semibold text-brand-600 hover:underline">
-                לכל הקבלות
-              </Link>
-            }
-          >
-            {!history.data?.length ? (
-              <p className="py-6 text-center text-sm text-ink-muted">הקבלות שתעלו יופיעו כאן.</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {history.data.slice(0, 8).map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{r.merchant || r.originalName || 'קבלה'}</p>
-                      <p className="tabular text-xs text-ink-muted">
-                        {formatDate(r.purchaseDate)}, {r.items.length} מוצרים
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-end">
-                      <p className="tabular text-sm font-semibold">{formatMoney(r.total)}</p>
-                      {r.status === 'confirmed' ? (
-                        <Badge tone="success">נשמרה</Badge>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => setReceipt(r)}>
-                          המשך בדיקה
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
         </div>
       )}
     </>

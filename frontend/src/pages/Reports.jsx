@@ -7,9 +7,10 @@ import PeriodNav from '../components/ui/PeriodNav';
 import StatCard from '../components/ui/StatCard';
 import { ProgressBar } from '../components/ui/Progress';
 import { EmptyState, ErrorState, PageLoader } from '../components/ui/States';
-import { ChartTooltip, axisProps } from '../components/dashboard/IncomeExpenseChart';
+import { ChartTooltip, axisProps } from '../components/ui/ChartTooltip';
 import { PriceChange } from '../components/products/ProductCard';
 import MonthSummary from '../components/reports/MonthSummary';
+import AiInsights from '../components/dashboard/AiInsights';
 import { useAuth } from '../context/AuthContext';
 import { useFetch } from '../hooks/useFetch';
 import { reportService } from '../services/report.service';
@@ -32,7 +33,7 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="דוחות" subtitle="סיכום חודשי והשוואה לחודש הקודם">
+      <PageHeader title="דוחות" subtitle="סיכום חודשי, מגמה שנתית, והשוואה לחודש הקודם">
         <PeriodNav
           period={period}
           calendar={calendar}
@@ -174,6 +175,8 @@ export default function Reports() {
                   </Card>
                 </div>
               </div>
+
+              <AiInsights />
             </>
           )}
         </div>
